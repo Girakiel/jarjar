@@ -134,6 +134,7 @@ export interface Session {
   pageCount: number;
   clickCount: number;
   rageClicks: number;
+  deadClicks: number;
   errorCount: number;
   recordingBytes: number;
   userId: string | null;
@@ -258,4 +259,73 @@ export interface SurveyResults {
   completed: number;
   questions: QuestionSummary[];
   responses: SurveyResponseItem[];
+}
+
+export type InsightType = 'rage' | 'dead' | 'error' | 'form' | 'unseen' | 'shallow' | 'bounce' | 'exit' | 'rating' | 'funnel';
+
+export interface Insight {
+  key: string;
+  type: InsightType;
+  severity: 'high' | 'medium' | 'low';
+  score: number;
+  title: string;
+  detail: string;
+  fix: string;
+  sessions: number;
+  share: number | null;
+  path?: string;
+  heatmap?: { device: Device; type: 'click' | 'scroll' };
+  examples: string[];
+  quotes?: string[];
+  funnelId?: string;
+  dismissed: boolean;
+}
+
+export interface InsightsResponse {
+  summary: {
+    sessions: number;
+    frustrated: number;
+    rageClicks: number;
+    deadClicks: number;
+    errorSessions: number;
+    formsStarted: number;
+    formsAbandoned: number;
+  };
+  insights: Insight[];
+}
+
+export interface NextStep {
+  path: string; // '(exit)' when the visit ended
+  count: number;
+  examples: string[];
+}
+
+export interface JourneysResponse {
+  sessions: number;
+  prefix: string[];
+  matching: number;
+  next: NextStep[];
+  topPaths: Array<{ steps: string[]; more: boolean; count: number; examples: string[] }>;
+}
+
+export interface FunnelStep {
+  type: 'page' | 'event';
+  value: string;
+}
+
+export interface Funnel {
+  id: string;
+  siteId: string;
+  name: string;
+  steps: FunnelStep[];
+  createdAt: number;
+  updatedAt: number;
+  entered?: number;
+  converted?: number;
+}
+
+export interface FunnelResult {
+  sessions: number;
+  steps: Array<FunnelStep & { count: number; dropped: number; droppedExamples: string[] }>;
+  convertedExamples: string[];
 }

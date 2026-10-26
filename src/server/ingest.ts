@@ -19,6 +19,8 @@ const MAX_EVENTS = 20_000;
 const MAX_CLICKS = 500;
 const MAX_MOVES = 3000;
 const MAX_TAGS = 50;
+const MAX_ERROR_MESSAGES = 20;
+const MAX_FORMS = 20;
 // Replace a page's heatmap snapshot at most this often.
 const SNAPSHOT_REFRESH_MS = 60 * 60 * 1000;
 
@@ -76,7 +78,20 @@ export function parseCollectPayload(input: unknown): CollectPayload {
   if (Array.isArray(p.clicks)) {
     payload.clicks = p.clicks.slice(0, MAX_CLICKS).flatMap((c) => {
       if (!c || typeof c !== 'object' || typeof c.s !== 'string' || !c.s) return [];
-      return [{ t: int(c.t), s: str(c.s, 1000), rx: clamp(num(c.rx), 0, 1), ry: clamp(num(c.ry), 0, 1), x: int(c.x), y: int(c.y), ...(c.r ? { r: 1 as const } : {}) }];
+      const label = str(c.l, 60).trim();
+      return [
+        {
+          t: int(c.t),
+          s: str(c.s, 1000),
+          rx: clamp(num(c.rx), 0, 1),
+          ry: clamp(num(c.ry), 0, 1),
+          x: int(c.x),
+          y: int(c.y),
+          ...(c.r ? { r: 1 as const } : {}),
+          ...(c.d ? { d: 1 as const } : {}),
+          ...(label ? { l: label } : {}),
+        },
+      ];
     });
   }
   if (Array.isArray(p.moves)) {
@@ -86,6 +101,18 @@ export function parseCollectPayload(input: unknown): CollectPayload {
     });
   }
   if (p.errors !== undefined) payload.errors = clamp(int(p.errors), 0, 1000);
+  if (Array.isArray(p.errs)) {
+    payload.errs = p.errs.slice(0, MAX_ERROR_MESSAGES).flatMap((e) => {
+      if (!e || typeof e !== 'object' || typeof e.m !== 'string' || !e.m.trim()) return [];
+      return [{ m: e.m.trim().slice(0, 300), n: clamp(int(e.n, 1), 1, 1000) }];
+    });
+  }
+  if (Array.isArray(p.forms)) {
+    payload.forms = p.forms.slice(0, MAX_FORMS).flatMap((f) => {
+      if (!f || typeof f !== 'object' || typeof f.s !== 'string' || !f.s) return [];
+      return [{ s: str(f.s, 1000), label: str(f.label, 100).trim(), fields: clamp(int(f.fields), 0, 500), last: str(f.last, 100).trim(), submitted: f.submitted === true }];
+    });
+  }
   if (Array.isArray(p.tags)) payload.tags = p.tags.filter((t): t is string => typeof t === 'string' && t.length > 0).map((t) => t.slice(0, 100)).slice(0, MAX_TAGS);
   const identity = p.identity as Record<string, unknown> | undefined;
   if (identity && typeof identity === 'object' && typeof identity.id === 'string' && identity.id) {
@@ -201,9 +228,27 @@ export async function ingest(db: Database, site: Site, payload: CollectPayload, 
 
     for (const c of clicks) {
       db.run(
-        'INSERT INTO clicks (session_id, site_id, path, device, ts, selector, rel_x, rel_y, page_x, page_y, rage) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        payload.sid, site.id, path, device, now, c.s, c.rx, c.ry, c.x, c.y, c.r ? 1 : 0,
+        `INSERT INTO clicks (session_id, site_id, path, device, ts, selector, rel_x, rel_y, page_x, page_y, rage, dead, label)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        payload.sid, site.id, path, device, now, c.s, c.rx, c.ry, c.x, c.y, c.r ? 1 : 0, c.d ? 1 : 0, c.l ?? null,
       );
+    }
+    for (const e of payload.errs ?? []) {
+      db.run('INSERT INTO js_errors (site_id, session_id, path, message, count, ts) VALUES (?, ?, ?, ?, ?, ?)', site.id, payload.sid, path, e.m, e.n, now);
+    }
+    // The tracker resends a form's state as it changes; keep the furthest it got.
+    for (const f of payload.forms ?? []) {
+      db.run(
+        `INSERT INTO form_interactions (site_id, session_id, path, form, label, fields, last_field, submitted, ts)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (session_id, path, form) DO UPDATE SET
+           label = COALESCE(NULLIF(excluded.label, ''), label), fields = MAX(fields, excluded.fields),
+           last_field = COALESCE(NULLIF(excluded.last_field, ''), last_field), submitted = MAX(submitted, excluded.submitted)`,
+        site.id, payload.sid, path, f.s, f.label, f.fields, f.last, f.submitted ? 1 : 0, now,
+      );
+    }
+    for (const name of payload.tags ?? []) {
+      db.run('INSERT INTO custom_events (site_id, session_id, name, ts) VALUES (?, ?, ?, ?)', site.id, payload.sid, name, now);
     }
     for (const m of moves) {
       db.run(
@@ -228,11 +273,11 @@ export async function ingest(db: Database, site: Site, payload: CollectPayload, 
 
     db.run(
       `UPDATE sessions SET
-         page_count = page_count + ?, click_count = click_count + ?, rage_clicks = rage_clicks + ?,
+         page_count = page_count + ?, click_count = click_count + ?, rage_clicks = rage_clicks + ?, dead_clicks = dead_clicks + ?,
          error_count = error_count + ?, recording_bytes = recording_bytes + ?,
          tags = COALESCE(?, tags), user_id = COALESCE(?, user_id), user_attrs = COALESCE(?, user_attrs)
        WHERE id = ?`,
-      pvExists ? 0 : 1, clicks.length, rageClicks, payload.errors ?? 0, chunk?.length ?? 0,
+      pvExists ? 0 : 1, clicks.length, rageClicks, clicks.filter((c) => c.d).length, payload.errors ?? 0, chunk?.length ?? 0,
       tags, payload.identity?.id ?? null, payload.identity?.attrs ? JSON.stringify(payload.identity.attrs) : null,
       payload.sid,
     );

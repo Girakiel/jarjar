@@ -24,6 +24,7 @@ interface SessionRow {
   page_count: number;
   click_count: number;
   rage_clicks: number;
+  dead_clicks: number;
   error_count: number;
   recording_bytes: number;
   user_id: string | null;
@@ -52,6 +53,7 @@ function toSession(row: SessionRow) {
     pageCount: row.page_count,
     clickCount: row.click_count,
     rageClicks: row.rage_clicks,
+    deadClicks: row.dead_clicks,
     errorCount: row.error_count,
     recordingBytes: row.recording_bytes,
     userId: row.user_id,
@@ -70,7 +72,7 @@ const SORTS: Record<string, string> = {
   oldest: 's.started_at ASC',
   longest: '(s.last_ts - s.first_ts) DESC',
   pages: 's.page_count DESC, s.started_at DESC',
-  frustration: '(s.rage_clicks * 3 + s.error_count) DESC, s.started_at DESC',
+  frustration: '(s.rage_clicks * 3 + s.error_count * 2 + s.dead_clicks) DESC, s.started_at DESC',
 };
 
 export async function sessionRoutes(app: FastifyInstance, opts: { db: Database }): Promise<void> {
@@ -93,6 +95,7 @@ export async function sessionRoutes(app: FastifyInstance, opts: { db: Database }
       params.push(minDuration * 1000);
     }
     if (q.rage === '1') where.push('s.rage_clicks > 0');
+    if (q.dead === '1') where.push('s.dead_clicks > 0');
     if (q.errors === '1') where.push('s.error_count > 0');
     if (q.unviewed === '1') where.push('s.viewed = 0');
     const page = str(q.page, 500).trim();
@@ -173,7 +176,7 @@ export async function sessionRoutes(app: FastifyInstance, opts: { db: Database }
       const ids = `SELECT s.id FROM sessions s WHERE s.site_id = ? AND EXISTS (SELECT 1 FROM json_each(s.tags) WHERE value = '${TEST_TAG}')`;
       db.run(`DELETE FROM feedback WHERE site_id = ? AND session_id IN (${ids})`, siteId, siteId);
       db.run(`DELETE FROM survey_responses WHERE site_id = ? AND session_id IN (${ids})`, siteId, siteId);
-      db.run("DELETE FROM snapshots WHERE site_id = ? AND path = '/demo'", siteId);
+      db.run("DELETE FROM snapshots WHERE site_id = ? AND path LIKE '/demo%'", siteId);
       return db.run(`DELETE FROM sessions WHERE id IN (${ids})`, siteId).changes;
     });
     return { sessions };

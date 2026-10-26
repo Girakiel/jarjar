@@ -6,8 +6,10 @@ Self-hosted, open-source behavior analytics in the spirit of Hotjar: **session r
 - **Heatmaps** — click, mouse-move and scroll-depth maps per page and device (desktop / tablet / mobile), drawn on top of a real snapshot of the page. Clicks are stored relative to the element that was clicked, so they line up even when the page renders at a different width. See your most clicked elements and highlight them on the page.
 - **Feedback widget** — a "rate your experience" tab (emoji or stars, plus a comment). Visitors can point at the part of the page they mean; you see it outlined on the page and can jump to that moment in their recording. Position, color, every piece of wording (any language) and the pages and devices it appears on are configurable.
 - **Surveys** — NPS (0–10), single choice, multiple choice and written questions, shown one at a time in a corner card. Target pages and devices; show them right away, after a delay, after scrolling, or when the visitor is about to leave. Results include the NPS score, answer charts and every response linked to its recording. Start from templates and preview any survey on the Test page.
-- **Overview** — sessions, visitors, page views, session length, top pages with average scroll depth, referrers, devices, browsers and OS, with comparisons to the previous period.
-- **Frustration signals** — rage clicks (3+ rapid clicks in one spot) and uncaught JS errors are detected automatically and filterable.
+- **Insights** — a ranked list of what to fix, found across all visits: rage-click and dead-click hotspots, recurring JavaScript errors, forms people start but don't send (and the field where they stop), content most visitors never scroll to, pages people bounce from or leave on, badly rated pages and the leakiest funnel steps. Each comes with a plain-language fix and links to example recordings and the heatmap.
+- **Journeys and funnels** — a path explorer (where visitors go from each page, and where they leave), the most common paths, and funnels made of page and event steps with conversion per step and recordings of the people who dropped off.
+- **Overview** — sessions, visitors, page views, session length, top issues, top pages with average scroll depth, referrers, devices, browsers and OS, with comparisons to the previous period.
+- **Frustration signals** — rage clicks (3+ rapid clicks in one spot), dead clicks (nothing on the page reacts within a second) and uncaught JS errors are detected automatically and filterable.
 - **Privacy by default** — form inputs are always masked, text masking and element blocking are opt-in per element or site-wide, Do Not Track / Global Privacy Control are respected, headless browsers and bots are ignored, and data is deleted after a configurable retention period.
 
 ## Quick start
@@ -116,7 +118,8 @@ test/                  server tests
 - One workspace: every account sees every site. Only the first account can be created from the UI.
 - SQLite suits a single instance and modest traffic. For heavy traffic, lower the sampling rate per site; a Postgres/ClickHouse backend would be the next step.
 - Heatmaps are drawn on the most recent snapshot of a page, so content that only appears after interaction (menus, modals) isn't in the backdrop.
-- Not yet built: funnels, email notifications, inviting team members, and sharing recordings by link.
+- Readable labels for clicked elements come from their visible text (never from what visitors type), and are skipped when "mask all text" is on or for masked elements.
+- Not yet built: email notifications, inviting team members, and sharing recordings by link.
 
 ## License
 

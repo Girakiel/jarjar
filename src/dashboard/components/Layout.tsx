@@ -32,8 +32,10 @@ export function Brand() {
 
 const NAV: Array<{ to: string; label: string; icon: IconName; end?: boolean }> = [
   { to: '', label: 'Overview', icon: 'overview', end: true },
+  { to: 'insights', label: 'Insights', icon: 'insights' },
   { to: 'recordings', label: 'Recordings', icon: 'recordings' },
   { to: 'heatmaps', label: 'Heatmaps', icon: 'heatmaps' },
+  { to: 'journeys', label: 'Journeys', icon: 'journeys' },
   { to: 'feedback', label: 'Feedback', icon: 'feedback' },
   { to: 'surveys', label: 'Surveys', icon: 'survey' },
   { to: 'test', label: 'Test page', icon: 'click' },

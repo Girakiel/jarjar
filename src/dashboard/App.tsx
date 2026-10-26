@@ -5,6 +5,8 @@ import { Layout } from './components/Layout';
 import { Spinner } from './components/ui';
 import { AuthPage } from './pages/Auth';
 import { FeedbackPage } from './pages/Feedback';
+import { InsightsPage } from './pages/Insights';
+import { JourneysPage } from './pages/Journeys';
 import { Home, NewSitePage } from './pages/Sites';
 import { OverviewPage } from './pages/Overview';
 import { RecordingsPage } from './pages/Recordings';
@@ -62,6 +64,8 @@ export function App() {
           <Route path="/sites/new" element={<NewSitePage />} />
           <Route path="/sites/:siteId" element={<Layout />}>
             <Route index element={<OverviewPage />} />
+            <Route path="insights" element={<InsightsPage />} />
+            <Route path="journeys" element={<JourneysPage />} />
             <Route path="recordings" element={<RecordingsPage />} />
             <Route path="recordings/:sessionId" element={<Suspense fallback={<Spinner />}><ReplayPage /></Suspense>} />
             <Route path="heatmaps" element={<Suspense fallback={<Spinner />}><HeatmapsPage /></Suspense>} />

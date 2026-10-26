@@ -31,7 +31,7 @@ const KIND_ICON: Record<Kind, IconName> = {
 // rrweb-player is a compiled Svelte component; its typings omit the Svelte runtime methods.
 type PlayerInstance = rrwebPlayer & { $set(props: Record<string, unknown>): void; $destroy(): void };
 
-const MARKER_COLORS = { 'rage-click': '#e5484d', error: '#f76b15', event: '#d97b06', feedback: '#2b9a66', 'survey-response': '#2b9a66' };
+const MARKER_COLORS = { 'rage-click': '#e5484d', 'dead-click': '#d97b06', error: '#f76b15', event: '#d97b06', feedback: '#2b9a66', 'survey-response': '#2b9a66' };
 
 interface RawEvent {
   type: number;
@@ -55,6 +55,7 @@ function buildTimeline(events: RawEvent[]): TimelineItem[] {
     } else if (e.type === 5) {
       const payload = e.data.payload ?? {};
       if (e.data.tag === 'rage-click') items.push({ offset, kind: 'rage', title: 'Rage click', sub: String(payload.selector ?? '') });
+      else if (e.data.tag === 'dead-click') items.push({ offset, kind: 'rage', title: 'Dead click', sub: String(payload.label ?? payload.selector ?? '') });
       else if (e.data.tag === 'error') items.push({ offset, kind: 'error', title: 'JavaScript error', sub: String(payload.message ?? '') });
       else if (e.data.tag === 'event') items.push({ offset, kind: 'event', title: String(payload.name ?? 'Event'), sub: 'Custom event' });
       else if (e.data.tag === 'feedback') items.push({ offset, kind: 'feedback', title: 'Left feedback', sub: RATING_EMOJI[Number(payload.rating)] ?? '' });

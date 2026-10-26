@@ -6,6 +6,7 @@ import { useSite } from '../components/Layout';
 import { Snippet } from '../components/Snippet';
 import { BarList, DaysPicker, ErrorBox, PageHeader, Spinner, Stat, useDays } from '../components/ui';
 import { flag, formatDurationLong, formatNumber, formatPercent, RATING_EMOJI } from '../format';
+import { TopInsights } from './Insights';
 
 function change(current: number, previous: number): number | null {
   if (!previous) return null;
@@ -80,6 +81,8 @@ export function OverviewPage() {
             value={data.feedback.avg ? `${RATING_EMOJI[Math.round(data.feedback.avg)]} ${data.feedback.avg.toFixed(1)}` : '—'}
           />
         </div>
+
+        <TopInsights siteId={site.id} days={days} />
 
         <div className="card">
           <div className="card-header">

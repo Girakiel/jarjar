@@ -37,6 +37,38 @@ const MAX_ERRORS_PER_PAGE = 50;
 const RAGE_WINDOW_MS = 1000;
 const RAGE_RADIUS_PX = 30;
 const RAGE_CLICKS = 3;
+// A click counts as "dead" when nothing on the page reacts within this time.
+const DEAD_CLICK_MS = 1000;
+// rrweb incremental sources that mean the page reacted: DOM mutation, scroll, input, media, styles.
+const REACTION_SOURCES = new Set([0, 3, 5, 7, 8, 13, 15]);
+// Clicking these does something even when the page doesn't change (focus, navigation, toggling media).
+const SELF_ACTING = 'input, textarea, select, option, label, a[href], summary, video, audio, iframe, [contenteditable="true"], [contenteditable=""]';
+const LABELLED = 'a, button, [role="button"], [role="link"], [role="tab"], [role="menuitem"], summary, label';
+const IGNORED_INPUT_TYPES = ['hidden', 'submit', 'button', 'reset', 'image'];
+
+interface PendingClick {
+  point: ClickPoint;
+  at: number;
+  timer: ReturnType<typeof setTimeout>;
+}
+
+interface FormState {
+  s: string;
+  label: string;
+  fields: Set<string>;
+  last: string;
+  submitted: boolean;
+  dirty: boolean;
+}
+
+type FormField = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
+
+/** Identifies a field by its name or label; never by what was typed into it. */
+function fieldName(field: FormField): string {
+  const name =
+    field.getAttribute('name') || field.id || field.getAttribute('aria-label') || field.getAttribute('placeholder') || field.type || field.tagName;
+  return name.slice(0, 60);
+}
 const BEACON_LIMIT = 60_000;
 
 type Attrs = Identity['attrs'];
@@ -94,6 +126,9 @@ class Tracker {
   // Per-page counters and interaction state.
   private movesThisPage = 0;
   private errorsThisPage = 0;
+  private errorMessages = new Map<string, number>();
+  private pendingClicks: PendingClick[] = [];
+  private forms = new Map<HTMLFormElement, FormState>();
   private recentClicks: Array<{ t: number; x: number; y: number }> = [];
   private lastMove = { t: 0, x: -1e6, y: -1e6 };
   private moveSelectors = new WeakMap<Element, string>();
@@ -191,6 +226,11 @@ class Tracker {
       record({
         emit: (event) => {
           this.events.push(event);
+          if (this.pendingClicks.length) {
+            const source = (event.data as { source?: number }).source;
+            const reacted = event.type === 2 || event.type === 4 || (event.type === 3 && source !== undefined && REACTION_SOURCES.has(source));
+            if (reacted) for (const pending of [...this.pendingClicks]) if (pending.at <= event.timestamp) this.settleClick(pending, false);
+          }
           if (this.events.length >= MAX_BUFFERED_EVENTS) this.flush();
         },
         maskAllInputs: true,
@@ -229,11 +269,15 @@ class Tracker {
     this.movesThisPage = 0;
     this.errorsThisPage = 0;
     this.recentClicks = [];
+    this.forms = new Map();
     this.lastPvState = '';
   }
 
   private listen(): void {
     document.addEventListener('click', (e) => this.onClick(e), true);
+    document.addEventListener('input', (e) => this.onFieldInput(e), true);
+    document.addEventListener('change', (e) => this.onFieldInput(e), true);
+    document.addEventListener('submit', (e) => this.onSubmit(e), true);
     document.addEventListener('mousemove', (e) => this.onMove(e), { capture: true, passive: true });
     document.addEventListener('keydown', () => this.touch(), { capture: true, passive: true });
     window.addEventListener('scroll', () => this.onScroll(), { passive: true });
@@ -268,6 +312,7 @@ class Tracker {
       this.pv.url = location.href;
       return;
     }
+    this.settleAllClicks(); // the click that led here wasn't dead
     this.flush();
     this.newPageview();
     this.applyFeedbackTargeting();
@@ -330,7 +375,79 @@ class Tracker {
       point.r = 1;
       if (this.recentClicks.length === RAGE_CLICKS) this.custom('rage-click', { selector: point.s });
     }
-    this.clicks.push(point);
+    const label = this.labelFor(el);
+    if (label) point.l = label;
+
+    if (el.closest(SELF_ACTING)) {
+      this.clicks.push(point);
+      return;
+    }
+    // Hold the click until we know whether the page reacted to it.
+    const pending: PendingClick = { point, at: now, timer: setTimeout(() => this.settleClick(pending, true), DEAD_CLICK_MS) };
+    this.pendingClicks.push(pending);
+  }
+
+  private settleClick(pending: PendingClick, dead: boolean): void {
+    clearTimeout(pending.timer);
+    this.pendingClicks = this.pendingClicks.filter((p) => p !== pending);
+    // Clicking to select text isn't a dead click.
+    if (dead && window.getSelection?.()?.toString()) dead = false;
+    if (dead) {
+      pending.point.d = 1;
+      this.custom('dead-click', { selector: pending.point.s, label: pending.point.l });
+    }
+    this.clicks.push(pending.point);
+  }
+
+  /** The visitor is leaving the page: whatever they clicked last led somewhere. */
+  private settleAllClicks(): void {
+    for (const pending of [...this.pendingClicks]) this.settleClick(pending, false);
+  }
+
+  /** A short visible name for a clicked element ("Choose plan"), so insights are readable. */
+  private labelFor(el: Element): string | undefined {
+    if (this.config?.maskAllText || el.closest('[data-jj-mask], .jj-mask, [data-jj-block], .jj-block')) return undefined;
+    const target = el.closest(LABELLED) ?? el;
+    let raw = target.getAttribute('aria-label') || '';
+    if (!raw && target instanceof HTMLInputElement) {
+      raw = IGNORED_INPUT_TYPES.includes(target.type) ? target.value : target.placeholder; // never what was typed
+    }
+    raw ||= target.textContent || target.getAttribute('title') || target.getAttribute('alt') || '';
+    const text = raw.replace(/\s+/g, ' ').trim();
+    // Long text means a container rather than a button or link.
+    return text && text.length <= 80 ? text.slice(0, 60) : undefined;
+  }
+
+  private formState(form: HTMLFormElement): FormState {
+    let state = this.forms.get(form);
+    if (!state) {
+      const submit = form.querySelector('button[type="submit"], button:not([type]), input[type="submit"]');
+      const submitText = this.config?.maskAllText ? '' : (submit instanceof HTMLInputElement ? submit.value : submit?.textContent ?? '').replace(/\s+/g, ' ').trim();
+      const label = form.getAttribute('aria-label') || form.getAttribute('name') || form.id || submitText || 'Form';
+      state = { s: selectorFor(form), label: label.slice(0, 60), fields: new Set(), last: '', submitted: false, dirty: false };
+      this.forms.set(form, state);
+    }
+    return state;
+  }
+
+  private onFieldInput(e: Event): void {
+    const field = e.target;
+    if (!this.active || !(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement)) return;
+    if (!field.form || (field instanceof HTMLInputElement && IGNORED_INPUT_TYPES.includes(field.type))) return;
+    const state = this.formState(field.form);
+    const name = fieldName(field);
+    if (state.last !== name || !state.fields.has(name)) {
+      state.fields.add(name);
+      state.last = name;
+      state.dirty = true;
+    }
+  }
+
+  private onSubmit(e: Event): void {
+    if (!this.active || !(e.target instanceof HTMLFormElement)) return;
+    const state = this.formState(e.target);
+    state.submitted = true;
+    state.dirty = true;
   }
 
   private onMove(e: MouseEvent): void {
@@ -374,6 +491,8 @@ class Tracker {
     if (!this.active || this.errorsThisPage >= MAX_ERRORS_PER_PAGE) return;
     this.errorsThisPage++;
     this.errors++;
+    const key = message.slice(0, 300);
+    this.errorMessages.set(key, (this.errorMessages.get(key) ?? 0) + 1);
     this.custom('error', { message: message.slice(0, 300) });
   }
 
@@ -386,13 +505,16 @@ class Tracker {
   private flush(final = false): void {
     const session = this.session;
     if (!this.active || !session) return;
+    if (final) this.settleAllClicks();
     this.pv.dh = docHeight();
+    const forms = [...this.forms.values()].filter((f) => f.dirty);
     const pvState = `${this.pv.url}|${this.pv.dh}|${this.pv.sy}`;
     const hasData =
       this.events.length > 0 ||
       this.clicks.length > 0 ||
       this.moves.length > 0 ||
       this.errors > 0 ||
+      forms.length > 0 ||
       this.pendingTags.length > 0 ||
       this.identityDirty ||
       this.sendMeta ||
@@ -413,6 +535,11 @@ class Tracker {
     if (this.clicks.length) payload.clicks = this.clicks;
     if (this.moves.length) payload.moves = this.moves;
     if (this.errors) payload.errors = this.errors;
+    if (this.errorMessages.size) payload.errs = [...this.errorMessages].map(([m, n]) => ({ m, n }));
+    if (forms.length) {
+      payload.forms = forms.map((f) => ({ s: f.s, label: f.label, fields: f.fields.size, last: f.last, submitted: f.submitted }));
+      forms.forEach((f) => (f.dirty = false));
+    }
     if (this.pendingTags.length) payload.tags = this.pendingTags;
     if (this.identityDirty && this.identity) payload.identity = this.identity;
 
@@ -420,6 +547,7 @@ class Tracker {
     this.clicks = [];
     this.moves = [];
     this.errors = 0;
+    this.errorMessages = new Map();
     this.pendingTags = [];
     this.identityDirty = false;
     this.sendMeta = false;

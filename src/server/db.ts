@@ -185,6 +185,66 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX survey_responses_survey ON survey_responses(survey_id, created_at);
   `,
+  `
+  -- Clicks after which nothing on the page changed, and a short visible label of the clicked element.
+  ALTER TABLE clicks ADD COLUMN dead INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE clicks ADD COLUMN label TEXT;
+  ALTER TABLE sessions ADD COLUMN dead_clicks INTEGER NOT NULL DEFAULT 0;
+
+  CREATE TABLE js_errors (
+    site_id TEXT NOT NULL,
+    session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    path TEXT NOT NULL,
+    message TEXT NOT NULL,
+    count INTEGER NOT NULL,
+    ts INTEGER NOT NULL
+  );
+  CREATE INDEX js_errors_site ON js_errors(site_id, ts);
+  CREATE INDEX js_errors_session ON js_errors(session_id);
+
+  -- One row per form a visitor started on a page; values are never stored.
+  CREATE TABLE form_interactions (
+    site_id TEXT NOT NULL,
+    session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    path TEXT NOT NULL,
+    form TEXT NOT NULL,
+    label TEXT,
+    fields INTEGER NOT NULL,
+    last_field TEXT,
+    submitted INTEGER NOT NULL DEFAULT 0,
+    ts INTEGER NOT NULL
+  );
+  CREATE UNIQUE INDEX forms_unique ON form_interactions(session_id, path, form);
+  CREATE INDEX forms_site ON form_interactions(site_id, ts);
+
+  -- jarjar('event', name) calls with their time, for funnels.
+  CREATE TABLE custom_events (
+    site_id TEXT NOT NULL,
+    session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    ts INTEGER NOT NULL
+  );
+  CREATE INDEX custom_events_site ON custom_events(site_id, ts);
+  CREATE INDEX custom_events_session ON custom_events(session_id);
+
+  CREATE TABLE funnels (
+    id TEXT PRIMARY KEY,
+    site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    steps TEXT NOT NULL,              -- [{type: 'page' | 'event', value}]
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+  CREATE INDEX funnels_site ON funnels(site_id);
+
+  -- Insights the owner marked as handled.
+  CREATE TABLE insight_dismissals (
+    site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    key TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (site_id, key)
+  );
+  `,
 ];
 
 export type Row = Record<string, SQLInputValue>;

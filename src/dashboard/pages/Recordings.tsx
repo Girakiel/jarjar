@@ -29,7 +29,7 @@ export function RecordingsPage() {
   };
 
   const query = new URLSearchParams({ days: String(days), limit: String(PAGE_SIZE) });
-  for (const key of ['device', 'minDuration', 'rage', 'errors', 'unviewed', 'page', 'tag', 'user', 'sort']) {
+  for (const key of ['device', 'minDuration', 'rage', 'dead', 'errors', 'unviewed', 'page', 'tag', 'user', 'sort']) {
     if (filter(key)) query.set(key, filter(key));
   }
   const queryString = query.toString();
@@ -103,6 +103,10 @@ export function RecordingsPage() {
           <label className="check">
             <input type="checkbox" checked={filter('rage') === '1'} onChange={(e) => setFilter('rage', e.target.checked ? '1' : '')} />
             Rage clicks
+          </label>
+          <label className="check">
+            <input type="checkbox" checked={filter('dead') === '1'} onChange={(e) => setFilter('dead', e.target.checked ? '1' : '')} />
+            Dead clicks
           </label>
           <label className="check">
             <input type="checkbox" checked={filter('errors') === '1'} onChange={(e) => setFilter('errors', e.target.checked ? '1' : '')} />
@@ -189,6 +193,12 @@ export function RecordingsPage() {
                           <span className="badge badge-danger" title="Rage clicks">
                             <Icon name="rage" />
                             {s.rageClicks}
+                          </span>
+                        )}
+                        {s.deadClicks > 0 && (
+                          <span className="badge badge-warning" title="Dead clicks">
+                            <Icon name="click" />
+                            {s.deadClicks}
                           </span>
                         )}
                         {s.errorCount > 0 && (

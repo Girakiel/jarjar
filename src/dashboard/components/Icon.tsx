@@ -30,6 +30,10 @@ const PATHS = {
   play: <polygon points="6 3 20 12 6 21 6 3" />,
   code: <><polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" /></>,
   survey: <><rect width="8" height="4" x="8" y="2" rx="1" /><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><path d="M12 11h4" /><path d="M12 16h4" /><path d="M8 11h.01" /><path d="M8 16h.01" /></>,
+  insights: <><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5" /><path d="M9 18h6" /><path d="M10 22h4" /></>,
+  journeys: <><circle cx="6" cy="19" r="3" /><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15" /><circle cx="18" cy="5" r="3" /></>,
+  funnel: <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />,
+  exit: <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" x2="9" y1="12" y2="12" /></>,
   jar: <><path d="M8 2h8" /><path d="M9 2v2.34a1.5 1.5 0 0 1-.77 1.31A6 6 0 0 0 5 11v8a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3v-8a6 6 0 0 0-3.23-5.35A1.5 1.5 0 0 1 15 4.34V2" /><path d="M5 12h14" /></>,
 } as const;
 

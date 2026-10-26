@@ -9,6 +9,7 @@ import { HttpError } from './http';
 import { authRoutes } from './routes/auth';
 import { feedbackRoutes } from './routes/feedback';
 import { heatmapRoutes } from './routes/heatmaps';
+import { insightRoutes } from './routes/insights';
 import { ingestRoutes } from './routes/ingest';
 import { sessionRoutes } from './routes/sessions';
 import { siteRoutes } from './routes/sites';
@@ -73,6 +74,7 @@ export async function buildApp({ config, db: providedDb, logger = true }: AppOpt
       await api.register(heatmapRoutes, { db });
       await api.register(feedbackRoutes, { db });
       await api.register(surveyRoutes, { db, sites });
+      await api.register(insightRoutes, { db, sites });
     },
     { prefix: '/api' },
   );

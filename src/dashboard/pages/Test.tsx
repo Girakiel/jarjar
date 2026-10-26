@@ -135,6 +135,11 @@ export function TestPage() {
       text: session?.rageClicks ? `${session.rageClicks} detected` : 'Click “Watch the video” 3+ times quickly',
     },
     {
+      label: 'Dead click',
+      done: !!session?.deadClicks,
+      text: session?.deadClicks ? `${session.deadClicks} detected` : 'Click something that does nothing, like a price',
+    },
+    {
       label: 'JavaScript error',
       done: !!session?.errorCount,
       text: session?.errorCount ? `${session.errorCount} captured` : 'The same button throws an error on purpose',

@@ -20,7 +20,8 @@ export function pageKey(href: string): string {
     const url = new URL(href);
     let path = url.pathname || '/';
     if (path.length > 1 && path.endsWith('/')) path = path.slice(0, -1);
-    const hash = url.hash.startsWith('#/') ? url.hash.split('?')[0] : '';
+    let hash = url.hash.startsWith('#/') ? url.hash.split('?')[0] : '';
+    if (hash === '#/') hash = ''; // the root route is the page itself
     return path + hash;
   } catch {
     return '/';
@@ -159,6 +160,8 @@ export interface ClickPoint {
   x: number; // page coordinates, used as a fallback
   y: number;
   r?: 1; // part of a rage-click burst
+  d?: 1; // dead click: nothing on the page changed afterwards
+  l?: string; // short visible label of the element ("Choose plan"), for readable insights
 }
 
 export interface MovePoint {
@@ -174,6 +177,15 @@ export interface Identity {
   attrs?: Record<string, string | number | boolean | null>;
 }
 
+/** A form the visitor started filling in on the current page. Field values are never sent. */
+export interface FormReport {
+  s: string; // selector of the <form>
+  label: string; // its name, or the text of its submit button
+  fields: number; // how many different fields were touched
+  last: string; // name of the last field touched
+  submitted: boolean;
+}
+
 export interface CollectPayload {
   site: string;
   sid: string; // session id (per tab, expires after 30 min of inactivity)
@@ -184,6 +196,8 @@ export interface CollectPayload {
   clicks?: ClickPoint[];
   moves?: MovePoint[];
   errors?: number; // JS errors since the previous batch
+  errs?: Array<{ m: string; n: number }>; // their messages, with counts
+  forms?: FormReport[];
   tags?: string[]; // custom event names fired via jarjar('event', name)
   identity?: Identity;
 }
