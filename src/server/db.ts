@@ -149,6 +149,42 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX feedback_site ON feedback(site_id, created_at);
   `,
+  `
+  -- Widget appearance and targeting (position, style, texts, pages, devices) as JSON.
+  ALTER TABLE sites ADD COLUMN feedback_config TEXT NOT NULL DEFAULT '{}';
+
+  -- The element a visitor pointed at ({s, x, y, w, h}) and when, for linking to the recording.
+  ALTER TABLE feedback ADD COLUMN element TEXT;
+  ALTER TABLE feedback ADD COLUMN viewport_w INTEGER;
+  ALTER TABLE feedback ADD COLUMN client_ts INTEGER;
+
+  CREATE TABLE surveys (
+    id TEXT PRIMARY KEY,
+    site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    active INTEGER NOT NULL DEFAULT 0,
+    definition TEXT NOT NULL,         -- questions, trigger, targeting, look (JSON)
+    views INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+  CREATE INDEX surveys_site ON surveys(site_id);
+
+  CREATE TABLE survey_responses (
+    id INTEGER PRIMARY KEY,
+    survey_id TEXT NOT NULL REFERENCES surveys(id) ON DELETE CASCADE,
+    site_id TEXT NOT NULL,
+    session_id TEXT,
+    visitor_id TEXT,
+    url TEXT,
+    path TEXT,
+    device TEXT,
+    answers TEXT NOT NULL,            -- {questionId: answer}
+    completed INTEGER NOT NULL DEFAULT 1,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX survey_responses_survey ON survey_responses(survey_id, created_at);
+  `,
 ];
 
 export type Row = Record<string, SQLInputValue>;

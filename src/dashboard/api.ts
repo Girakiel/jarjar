@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { FeedbackWidgetConfig, PickedElement, QuestionType, SurveyAnswer, SurveyDefinition } from '../shared/protocol';
+
+export type { FeedbackWidgetConfig, PickedElement, QuestionType, SurveyAnswer, SurveyQuestion } from '../shared/protocol';
 
 export class ApiError extends Error {
   constructor(
@@ -77,7 +80,7 @@ export interface Site {
   sampleRate: number;
   maskAllText: boolean;
   respectDnt: boolean;
-  feedback: { enabled: boolean; title: string; color: string };
+  feedback: FeedbackWidgetConfig & { enabled: boolean };
   createdAt: number;
   lastSeenAt: number | null;
   sessions30d?: number;
@@ -196,10 +199,63 @@ export interface FeedbackItem {
   comment: string | null;
   createdAt: number;
   hasRecording: number | null;
+  element: PickedElement | null;
+  viewportW: number | null;
+  clientTs: number | null;
 }
 
 export interface FeedbackList {
   stats: { count: number; avg: number | null; comments: number };
   distribution: Array<{ rating: number; count: number }>;
   items: FeedbackItem[];
+}
+
+export type SurveyContent = Omit<SurveyDefinition, 'id'>;
+
+export interface Survey {
+  id: string;
+  siteId: string;
+  name: string;
+  active: boolean;
+  definition: SurveyContent;
+  views: number;
+  createdAt: number;
+  updatedAt: number;
+  responses?: number;
+  lastResponseAt?: number | null;
+}
+
+export interface QuestionSummary {
+  id: string;
+  type: QuestionType;
+  text: string;
+  answered: number;
+  // NPS
+  counts?: number[];
+  promoters?: number;
+  passives?: number;
+  detractors?: number;
+  score?: number | null;
+  // Choice questions
+  options?: Array<{ option: string; count: number }>;
+}
+
+export interface SurveyResponseItem {
+  id: number;
+  sessionId: string | null;
+  hasRecording: boolean;
+  path: string;
+  device: string;
+  completed: boolean;
+  answers: Record<string, SurveyAnswer>;
+  createdAt: number;
+}
+
+export interface SurveyResults {
+  survey: Survey;
+  allTime: { views: number; responses: number };
+  total: number;
+  completed: number;
+  questions: QuestionSummary[];
+  responses: SurveyResponseItem[];
 }

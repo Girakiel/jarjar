@@ -11,17 +11,23 @@
 
 import { record } from '@rrweb/record';
 import {
+  deviceForWidth,
+  matchesPage,
   pageKey,
   type ClickPoint,
   type CollectPayload,
   type Identity,
   type MovePoint,
   type PageviewInfo,
+  type SurveyAnswer,
+  type SurveyDefinition,
   type TrackerConfig,
 } from '../shared/protocol';
-import { mountFeedbackWidget, WIDGET_HOST_ID } from './feedback';
-import { isOptedOut, loadSession, saveSession, setOptOut, uuid, visitorId, SESSION_TIMEOUT_MS, type SessionState } from './identity';
+import { FeedbackWidget, WIDGET_HOST_ID } from './feedback';
+import { getLocal, isOptedOut, loadSession, saveSession, setLocal, setOptOut, uuid, visitorId, SESSION_TIMEOUT_MS, type SessionState } from './identity';
+import { PICKER_HOST_ID } from './picker';
 import { heatmapTarget, selectorFor } from './selector';
+import { armTrigger, showSurvey, SURVEY_HOST_ID } from './survey';
 
 const FIRST_FLUSH_MS = 1000;
 const FLUSH_INTERVAL_MS = 5000;
@@ -41,10 +47,18 @@ function docHeight(): number {
   return Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0);
 }
 
-function inWidget(e: Event): boolean {
-  const target = e.target;
-  return target instanceof Element && target.id === WIDGET_HOST_ID;
+const UI_HOST_IDS = [WIDGET_HOST_ID, SURVEY_HOST_ID, PICKER_HOST_ID];
+
+/** Our own UI (feedback, surveys, picker) is left out of heatmaps. */
+function isOwnUi(target: EventTarget | null): boolean {
+  return target instanceof Element && UI_HOST_IDS.includes(target.id);
 }
+
+function inWidget(e: Event): boolean {
+  return isOwnUi(e.target);
+}
+
+const surveySeenKey = (id: string) => `_jj_sv_${id}`;
 
 function sanitizeAttrs(value: unknown): Attrs {
   if (!value || typeof value !== 'object') return undefined;
@@ -85,6 +99,13 @@ class Tracker {
   private moveSelectors = new WeakMap<Element, string>();
   private scrollQueued = false;
 
+  // On-page UI.
+  private feedbackWidget?: FeedbackWidget;
+  private cancelSurveyTrigger?: () => void;
+  private surveyOpen = false;
+  // ?jj_survey=ID shows that survey right away: used to preview surveys from the dashboard.
+  private previewSurvey = new URLSearchParams(location.search).get('jj_survey');
+
   constructor(
     private readonly site: string,
     private readonly host: string,
@@ -117,7 +138,10 @@ class Tracker {
     this.newPageview();
     this.listen();
     this.startRecording();
-    if (config.feedback?.enabled) this.whenBodyReady(() => this.mountFeedback());
+    this.whenBodyReady(() => {
+      this.mountFeedback();
+      this.setupSurveys();
+    });
     this.timer = setTimeout(() => this.tick(), FIRST_FLUSH_MS);
   }
 
@@ -157,7 +181,8 @@ class Tracker {
     this.active = false;
     this.stopRecording?.();
     clearTimeout(this.timer);
-    document.getElementById(WIDGET_HOST_ID)?.remove();
+    this.cancelSurveyTrigger?.();
+    for (const id of UI_HOST_IDS) document.getElementById(id)?.remove();
   }
 
   private startRecording(): void {
@@ -245,6 +270,8 @@ class Tracker {
     }
     this.flush();
     this.newPageview();
+    this.applyFeedbackTargeting();
+    this.setupSurveys();
     // A fresh snapshot of the new route gives heatmaps something to draw on.
     setTimeout(() => {
       if (!this.active) return;
@@ -451,29 +478,103 @@ class Tracker {
     else document.addEventListener('DOMContentLoaded', fn, { once: true });
   }
 
+  /** Small JSON posts (feedback, surveys). keepalive lets them finish if the page is closing. */
+  private post(path: string, body: unknown): Promise<Response> {
+    return fetch(`${this.host}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      credentials: 'omit',
+      keepalive: true,
+      body: JSON.stringify(body),
+    });
+  }
+
   private mountFeedback(): void {
     const fb = this.config?.feedback;
     if (!fb) return;
-    mountFeedbackWidget({
-      title: fb.title,
-      color: fb.color,
-      onSubmit: async (rating, comment) => {
-        const res = await fetch(`${this.host}/i/feedback`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain' },
-          credentials: 'omit',
-          body: JSON.stringify({
-            site: this.site,
-            sid: this.session?.id ?? '',
-            vid: this.vid,
-            url: location.href,
-            vw: window.innerWidth,
-            rating,
-            comment,
-          }),
+    this.feedbackWidget = new FeedbackWidget(
+      fb,
+      async ({ rating, comment, element }) => {
+        const res = await this.post('/i/feedback', {
+          site: this.site,
+          sid: this.session?.id ?? '',
+          vid: this.vid,
+          url: location.href,
+          vw: window.innerWidth,
+          ts: Date.now(),
+          rating,
+          comment,
+          element,
         });
         if (!res.ok) throw new Error(`feedback failed: ${res.status}`);
         this.custom('feedback', { rating });
+      },
+      (el) => isOwnUi(el),
+    );
+    this.applyFeedbackTargeting();
+  }
+
+  /** Shows the feedback tab only on the pages and devices chosen in the dashboard. */
+  private applyFeedbackTargeting(): void {
+    const fb = this.config?.feedback;
+    if (!fb || !this.feedbackWidget) return;
+    const device = deviceForWidth(window.innerWidth);
+    this.feedbackWidget.setVisible(matchesPage(fb.pages, pageKey(location.href)) && fb.devices.includes(device));
+  }
+
+  /** Arms the first survey that targets this page and hasn't been shown to this visitor yet. */
+  private setupSurveys(): void {
+    this.cancelSurveyTrigger?.();
+    this.cancelSurveyTrigger = undefined;
+    if (!this.config || this.surveyOpen || !document.body) return;
+
+    if (this.previewSurvey) {
+      const id = this.previewSurvey;
+      this.previewSurvey = null;
+      fetch(`${this.host}/i/survey?site=${encodeURIComponent(this.site)}&id=${encodeURIComponent(id)}`, { credentials: 'omit', cache: 'no-cache' })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((def: SurveyDefinition | null) => def && setTimeout(() => this.openSurvey(def, true), 800))
+        .catch(() => undefined);
+      return;
+    }
+
+    const path = pageKey(location.href);
+    const device = deviceForWidth(window.innerWidth);
+    const survey = this.config.surveys.find(
+      (s) => matchesPage(s.pages, path) && s.devices.includes(device) && !getLocal(surveySeenKey(s.id)),
+    );
+    if (!survey) return;
+    this.cancelSurveyTrigger = armTrigger(survey.trigger, () => {
+      this.cancelSurveyTrigger = undefined;
+      this.openSurvey(survey, false);
+    });
+  }
+
+  private openSurvey(def: SurveyDefinition, preview: boolean): void {
+    if (!this.active || this.surveyOpen) return;
+    this.surveyOpen = true;
+    if (!preview) {
+      // Each visitor sees a survey once, whether they answer it or not.
+      setLocal(surveySeenKey(def.id), '1');
+      this.post('/i/survey/view', { site: this.site, survey: def.id }).catch(() => undefined);
+    }
+    this.custom('survey', { id: def.id });
+    showSurvey(def, {
+      onDone: (answers: Record<string, SurveyAnswer>, completed: boolean) => {
+        this.post('/i/survey', {
+          site: this.site,
+          survey: def.id,
+          sid: this.session?.id ?? '',
+          vid: this.vid,
+          url: location.href,
+          vw: window.innerWidth,
+          answers,
+          completed,
+        }).catch(() => undefined);
+        this.custom('survey-response', { id: def.id, completed });
+      },
+      onClose: () => {
+        this.surveyOpen = false;
       },
     });
   }

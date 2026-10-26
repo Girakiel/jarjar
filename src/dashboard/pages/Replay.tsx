@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import rrwebPlayer from 'rrweb-player';
 import type { eventWithTime } from '@rrweb/types';
 import 'rrweb-player/dist/style.css';
@@ -31,7 +31,7 @@ const KIND_ICON: Record<Kind, IconName> = {
 // rrweb-player is a compiled Svelte component; its typings omit the Svelte runtime methods.
 type PlayerInstance = rrwebPlayer & { $set(props: Record<string, unknown>): void; $destroy(): void };
 
-const MARKER_COLORS = { 'rage-click': '#e5484d', error: '#f76b15', event: '#d97b06', feedback: '#2b9a66' };
+const MARKER_COLORS = { 'rage-click': '#e5484d', error: '#f76b15', event: '#d97b06', feedback: '#2b9a66', 'survey-response': '#2b9a66' };
 
 interface RawEvent {
   type: number;
@@ -58,6 +58,10 @@ function buildTimeline(events: RawEvent[]): TimelineItem[] {
       else if (e.data.tag === 'error') items.push({ offset, kind: 'error', title: 'JavaScript error', sub: String(payload.message ?? '') });
       else if (e.data.tag === 'event') items.push({ offset, kind: 'event', title: String(payload.name ?? 'Event'), sub: 'Custom event' });
       else if (e.data.tag === 'feedback') items.push({ offset, kind: 'feedback', title: 'Left feedback', sub: RATING_EMOJI[Number(payload.rating)] ?? '' });
+      else if (e.data.tag === 'survey') items.push({ offset, kind: 'event', title: 'Saw a survey' });
+      else if (e.data.tag === 'survey-response') {
+        items.push({ offset, kind: 'feedback', title: payload.completed === false ? 'Answered part of a survey' : 'Answered a survey' });
+      }
     }
   }
   return items;
@@ -92,7 +96,17 @@ function indexAt(items: TimelineItem[], time: number): number {
   return found;
 }
 
-function Player({ events, onTime, playerRef }: { events: eventWithTime[]; onTime: (t: number) => void; playerRef: React.MutableRefObject<rrwebPlayer | null> }) {
+function Player({
+  events,
+  onTime,
+  playerRef,
+  startAt,
+}: {
+  events: eventWithTime[];
+  onTime: (t: number) => void;
+  playerRef: React.MutableRefObject<rrwebPlayer | null>;
+  startAt?: number; // ms from the start of the recording
+}) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const onTimeRef = useRef(onTime);
   onTimeRef.current = onTime;
@@ -117,6 +131,7 @@ function Player({ events, onTime, playerRef }: { events: eventWithTime[]; onTime
       },
     }) as PlayerInstance;
     playerRef.current = player;
+    if (startAt) player.goto(startAt, true);
     player.addEventListener('ui-update-current-time', (detail) => onTimeRef.current((detail as { payload: number }).payload));
 
     const observer = new ResizeObserver(() => {
@@ -151,6 +166,9 @@ export function ReplayPage() {
   const { sessionId } = useParams();
   const navigate = useNavigate();
   const [days] = useDays();
+  // ?at=<client timestamp> opens the recording just before that moment (e.g. from a feedback item).
+  const [params] = useSearchParams();
+  const at = Number(params.get('at')) || 0;
   const { data: detail, error } = useApi<SessionDetail>(`/sessions/${sessionId}`);
   const [events, setEvents] = useState<eventWithTime[]>();
   const [eventsError, setEventsError] = useState<string>();
@@ -170,6 +188,7 @@ export function ReplayPage() {
 
   const timeline = useMemo(() => collapseClicks(buildTimeline((events ?? []) as unknown as RawEvent[])), [events]);
   const hasSnapshot = events?.some((e) => e.type === 2);
+  const startAt = at && events?.length ? Math.max(0, at - events[0].timestamp - 3000) : undefined;
 
   const onTime = (t: number) => {
     const i = indexAt(timeline, t);
@@ -229,7 +248,7 @@ export function ReplayPage() {
             </Empty>
           </div>
         ) : (
-          <Player events={events} onTime={onTime} playerRef={playerRef} />
+          <Player events={events} onTime={onTime} playerRef={playerRef} startAt={startAt} />
         )}
 
         <div className="card replay-side">

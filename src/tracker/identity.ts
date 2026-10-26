@@ -75,3 +75,12 @@ export function isOptedOut(): boolean {
 export function setOptOut(value: boolean): void {
   write(local, OPT_OUT_KEY, value ? '1' : null);
 }
+
+/** Persistent per-visitor flags, e.g. which surveys were already shown. */
+export function getLocal(key: string): string | null {
+  return read(local, key);
+}
+
+export function setLocal(key: string, value: string): void {
+  write(local, key, value);
+}

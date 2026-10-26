@@ -35,6 +35,7 @@ const NAV: Array<{ to: string; label: string; icon: IconName; end?: boolean }> =
   { to: 'recordings', label: 'Recordings', icon: 'recordings' },
   { to: 'heatmaps', label: 'Heatmaps', icon: 'heatmaps' },
   { to: 'feedback', label: 'Feedback', icon: 'feedback' },
+  { to: 'surveys', label: 'Surveys', icon: 'survey' },
   { to: 'test', label: 'Test page', icon: 'click' },
   { to: 'settings', label: 'Settings', icon: 'settings' },
 ];

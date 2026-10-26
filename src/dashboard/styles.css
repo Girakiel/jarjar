@@ -1466,18 +1466,28 @@ tr.clickable:hover td {
 
 /* ---------- test page ---------- */
 
+/* Fills the window below the header (and any notices), so the shop's bottom corners stay visible. */
+.test-page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 76px);
+  min-height: 640px;
+}
+
 .test-layout {
+  flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;
   gap: 16px;
-  height: calc(100vh - 140px);
-  min-height: 560px;
 }
 
 @media (max-width: 1000px) {
+  .test-page {
+    height: auto;
+  }
   .test-layout {
     grid-template-columns: 1fr;
-    height: auto;
   }
   .test-stage {
     height: 75vh;
@@ -1580,4 +1590,284 @@ tr.clickable:hover td {
   color: var(--accent-text);
   cursor: pointer;
   text-decoration: underline;
+}
+
+/* ---------- feedback widget settings ---------- */
+
+.fb-settings {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.fb-preview {
+  position: relative;
+  width: 280px;
+  flex: none;
+  padding: 18px 26px;
+  border-radius: var(--radius);
+  background: repeating-conic-gradient(var(--surface-2) 0% 25%, var(--bg) 0% 50%) 50% / 16px 16px;
+  border: 1px solid var(--border);
+}
+
+.fb-preview-tab {
+  position: absolute;
+  top: 24px;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 10px 5px;
+  max-height: 150px;
+  overflow: hidden;
+}
+
+.fb-preview.right .fb-preview-tab {
+  right: 0;
+  border-radius: 0 5px 5px 0;
+}
+
+.fb-preview.left .fb-preview-tab {
+  left: 0;
+  border-radius: 5px 0 0 5px;
+}
+
+.fb-preview-panel {
+  background: white;
+  color: #1c1c1f;
+  border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.16);
+  padding: 14px;
+  font-size: 12px;
+}
+
+.fb-preview-title {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.fb-preview-emoji {
+  display: flex;
+  gap: 4px;
+}
+
+.fb-preview-emoji span {
+  flex: 1;
+  text-align: center;
+  font-size: 18px;
+  background: #f4f4f6;
+  border: 2px solid transparent;
+  border-radius: 7px;
+  padding: 4px 0;
+}
+
+.fb-preview-emoji span.selected {
+  background: white;
+}
+
+.fb-preview-stars {
+  display: flex;
+  justify-content: center;
+  gap: 2px;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.fb-preview-input,
+.fb-preview-pick {
+  margin-top: 8px;
+  border: 1px solid #d8d8de;
+  border-radius: 6px;
+  padding: 6px 8px;
+  color: #8b8b95;
+}
+
+.fb-preview-pick {
+  border-style: dashed;
+  color: #45454d;
+}
+
+.fb-preview-send {
+  margin-top: 8px;
+  color: white;
+  text-align: center;
+  font-weight: 600;
+  border-radius: 6px;
+  padding: 7px;
+}
+
+details.wording summary {
+  cursor: pointer;
+  font-weight: 500;
+}
+
+details.wording .hint {
+  color: var(--muted);
+  font-size: 12.5px;
+  margin: 8px 0 12px;
+}
+
+.wording-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px 16px;
+}
+
+/* ---------- modal ---------- */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(10, 10, 20, 0.5);
+}
+
+.modal {
+  width: min(1180px, 100%);
+  height: min(88vh, 960px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+
+.modal-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+/* ---------- surveys ---------- */
+
+.template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.template {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  padding: 14px 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.template:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.question-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.options-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-left: 4px;
+}
+
+.options-editor .link-button {
+  align-self: flex-start;
+}
+
+.toggle.small {
+  font-size: 13px;
+  gap: 8px;
+}
+
+.nps-summary {
+  display: flex;
+  gap: 32px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.nps-score {
+  font-size: 44px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.nps-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 10px;
+}
+
+.nps-bars {
+  flex: 1;
+  min-width: 280px;
+  display: grid;
+  grid-template-columns: repeat(11, 1fr);
+  gap: 6px;
+  height: 150px;
+  align-items: end;
+}
+
+.nps-bar {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+}
+
+.nps-bar .fill {
+  width: 100%;
+  min-height: 2px;
+  border-radius: 4px 4px 0 0;
+}
+
+.nps-bar .fill.promoter {
+  background: var(--success);
+}
+
+.nps-bar .fill.passive {
+  background: var(--border-strong);
+}
+
+.nps-bar .fill.detractor {
+  background: var(--danger);
+}
+
+.text-answers {
+  display: flex;
+  flex-direction: column;
+}
+
+.text-answer {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.text-answer:last-child {
+  border-bottom: 0;
+}
+
+.text-answer p {
+  margin: 0 0 2px;
 }

@@ -29,6 +29,7 @@ const PATHS = {
   search: <><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></>,
   play: <polygon points="6 3 20 12 6 21 6 3" />,
   code: <><polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" /></>,
+  survey: <><rect width="8" height="4" x="8" y="2" rx="1" /><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><path d="M12 11h4" /><path d="M12 16h4" /><path d="M8 11h.01" /><path d="M8 16h.01" /></>,
   jar: <><path d="M8 2h8" /><path d="M9 2v2.34a1.5 1.5 0 0 1-.77 1.31A6 6 0 0 0 5 11v8a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3v-8a6 6 0 0 0-3.23-5.35A1.5 1.5 0 0 1 15 4.34V2" /><path d="M5 12h14" /></>,
 } as const;
 

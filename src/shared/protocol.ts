@@ -27,17 +27,103 @@ export function pageKey(href: string): string {
   }
 }
 
+/**
+ * Whether a page path matches a list of patterns such as `/pricing`, `/blog/*` or `*checkout*`.
+ * `*` matches anything; an empty list matches every page.
+ */
+export function matchesPage(patterns: string[], path: string): boolean {
+  if (!patterns.length) return true;
+  return patterns.some((pattern) => {
+    const source = pattern
+      .trim()
+      .split('*')
+      .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
+      .join('.*');
+    return source !== '' && new RegExp(`^${source}$`, 'i').test(path);
+  });
+}
+
+export type WidgetPosition = 'left' | 'right';
+
+export interface FeedbackTexts {
+  tab: string; // the button on the edge of the page
+  placeholder: string; // comment box
+  send: string;
+  thanks: string;
+  pick: string; // "point at something" button
+  pickHint: string; // banner shown while picking
+  picked: string; // shown once an element is picked
+}
+
+export const DEFAULT_FEEDBACK_TEXTS: FeedbackTexts = {
+  tab: 'Feedback',
+  placeholder: 'Tell us more (optional)',
+  send: 'Send feedback',
+  thanks: 'Thanks for your feedback!',
+  pick: 'Point at something on the page',
+  pickHint: 'Click the part of the page your feedback is about. Press Esc to cancel.',
+  picked: 'Part of the page selected',
+};
+
+export interface FeedbackWidgetConfig {
+  title: string; // the question
+  color: string;
+  position: WidgetPosition;
+  style: 'emoji' | 'stars';
+  allowPick: boolean;
+  texts: FeedbackTexts;
+  pages: string[]; // patterns; empty = all pages
+  devices: Device[];
+}
+
+export type QuestionType = 'nps' | 'single' | 'multiple' | 'text';
+
+export interface SurveyQuestion {
+  id: string;
+  type: QuestionType;
+  text: string;
+  required: boolean;
+  options: string[]; // for single / multiple choice
+}
+
+export type SurveyTriggerType = 'immediate' | 'delay' | 'scroll' | 'exit';
+
+export interface SurveyTexts {
+  next: string;
+  submit: string;
+  thanks: string;
+  low: string; // NPS scale labels
+  high: string;
+}
+
+export const DEFAULT_SURVEY_TEXTS: SurveyTexts = {
+  next: 'Next',
+  submit: 'Send',
+  thanks: 'Thank you!',
+  low: 'Not likely',
+  high: 'Very likely',
+};
+
+/** Everything the tracker needs to show a survey. */
+export interface SurveyDefinition {
+  id: string;
+  questions: SurveyQuestion[];
+  trigger: { type: SurveyTriggerType; value: number }; // seconds for delay, percent for scroll
+  pages: string[];
+  devices: Device[];
+  position: WidgetPosition;
+  color: string;
+  texts: SurveyTexts;
+}
+
 /** Returned by GET /i/config so the tracker knows what to collect. */
 export interface TrackerConfig {
   enabled: boolean;
   sampleRate: number; // 0-100, share of sessions to track
   maskAllText: boolean;
   respectDnt: boolean;
-  feedback: {
-    enabled: boolean;
-    title: string;
-    color: string;
-  } | null;
+  feedback: FeedbackWidgetConfig | null;
+  surveys: SurveyDefinition[];
 }
 
 /** Sent with the first batch of every page load. */
@@ -102,14 +188,38 @@ export interface CollectPayload {
   identity?: Identity;
 }
 
+/** The element a visitor pointed at, in page coordinates at their viewport width. */
+export interface PickedElement {
+  s: string; // CSS selector
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 export interface FeedbackPayload {
   site: string;
   sid: string;
   vid: string;
   url: string;
   vw: number;
+  ts?: number; // client time, to find the moment in the recording
   rating: number; // 1-5
   comment?: string;
+  element?: PickedElement;
+}
+
+export type SurveyAnswer = number | string | string[];
+
+export interface SurveyResponsePayload {
+  site: string;
+  survey: string;
+  sid: string;
+  vid: string;
+  url: string;
+  vw: number;
+  answers: Record<string, SurveyAnswer>; // by question id
+  completed: boolean; // false when the visitor closed it part-way
 }
 
 /** rrweb event type numbers we care about (mirrors rrweb's EventType enum). */

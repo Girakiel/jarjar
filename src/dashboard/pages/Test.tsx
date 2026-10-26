@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { api, type HeatmapPage, type Session, type SessionDetail, type Site } from '../api';
+import { Link, useSearchParams } from 'react-router-dom';
+import { api, useApi, type HeatmapPage, type Session, type SessionDetail, type Site, type Survey } from '../api';
 import { Icon } from '../components/Icon';
 import { useSite } from '../components/Layout';
 import { PageHeader, Segmented } from '../components/ui';
@@ -41,6 +41,15 @@ export function TestPage() {
   const stageRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const stage = useFrameSize(stageRef);
+  // ?survey=ID previews that survey in the shop (from the survey editor).
+  const [params, setParams] = useSearchParams();
+  const previewId = params.get('survey');
+  const { data: previewSurvey } = useApi<Survey>(previewId ? `/surveys/${previewId}` : null);
+  const stopPreview = () => {
+    const next = new URLSearchParams(params);
+    next.delete('survey');
+    setParams(next, { replace: true });
+  };
 
   const poll = useCallback(async () => {
     const [list, pages] = await Promise.all([
@@ -138,7 +147,7 @@ export function TestPage() {
       text: feedbackCount ? (
         `${feedbackCount} response${feedbackCount === 1 ? '' : 's'}`
       ) : site.feedback.enabled ? (
-        'Use the “Feedback” tab on the right edge'
+        `Use the “${site.feedback.texts.tab}” tab on the ${site.feedback.position} edge`
       ) : (
         <>
           The widget is off.{' '}
@@ -152,7 +161,7 @@ export function TestPage() {
   ];
 
   return (
-    <>
+    <div className="test-page">
       <PageHeader title="Test page" subtitle="Use the demo shop like a visitor would. jarjar records it exactly as it would on your site.">
         <Segmented
           label="Preview size"
@@ -180,14 +189,28 @@ export function TestPage() {
         </div>
       )}
 
+      {previewId && (
+        <div className="notice" style={{ marginBottom: 16 }}>
+          <Icon name="survey" />
+          <div style={{ flex: 1 }}>
+            Previewing the survey <strong>{previewSurvey?.name ?? '…'}</strong>. It appears in the shop in a moment, even if it's switched off. Answers are
+            saved as test data.{' '}
+            <Link to={`/sites/${site.id}/surveys/${previewId}`}>See its results</Link>
+          </div>
+          <button type="button" className="btn btn-sm" onClick={stopPreview}>
+            Stop preview
+          </button>
+        </div>
+      )}
+
       <div className="test-layout">
         <div className="card test-stage" ref={stageRef}>
           <div className="test-frame" style={{ width: width * scale, height: frameHeight * scale }}>
             <iframe
-              key={`${frameKey}-${device}`}
+              key={`${frameKey}-${device}-${previewId ?? ''}`}
               ref={iframeRef}
               title="Demo shop"
-              src={`/demo?site=${site.id}`}
+              src={`/demo?site=${site.id}${previewId ? `&jj_survey=${previewId}` : ''}`}
               style={{ width, height: frameHeight, transform: `scale(${scale})` }}
             />
           </div>
@@ -235,6 +258,6 @@ export function TestPage() {
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }

@@ -6,6 +6,8 @@ import {
   RRWEB_META,
   type CollectPayload,
   type FeedbackPayload,
+  type SurveyAnswer,
+  type SurveyResponsePayload,
 } from '../shared/protocol';
 import type { Database } from './db';
 import { badRequest, clamp, gzip, HttpError, int, num, str } from './http';
@@ -250,7 +252,7 @@ export function parseFeedbackPayload(input: unknown): FeedbackPayload {
   const p = input as Record<string, unknown>;
   const rating = int(p.rating);
   if (rating < 1 || rating > 5) throw badRequest('rating must be 1-5');
-  return {
+  const feedback: FeedbackPayload = {
     site: str(p.site, 64),
     sid: typeof p.sid === 'string' && ID_RE.test(p.sid) ? p.sid : '',
     vid: typeof p.vid === 'string' && ID_RE.test(p.vid) ? p.vid : '',
@@ -259,11 +261,70 @@ export function parseFeedbackPayload(input: unknown): FeedbackPayload {
     rating,
     comment: str(p.comment, 2000).trim(),
   };
+  if (p.ts !== undefined) feedback.ts = int(p.ts);
+  const el = p.element as Record<string, unknown> | undefined;
+  if (el && typeof el === 'object' && typeof el.s === 'string' && el.s) {
+    feedback.element = {
+      s: str(el.s, 1000),
+      x: clamp(int(el.x), 0, 1_000_000),
+      y: clamp(int(el.y), 0, 1_000_000),
+      w: clamp(int(el.w), 0, 100_000),
+      h: clamp(int(el.h), 0, 1_000_000),
+    };
+  }
+  return feedback;
 }
 
 export function saveFeedback(db: Database, site: Site, fb: FeedbackPayload, now = Date.now()): void {
   db.run(
-    'INSERT INTO feedback (site_id, session_id, visitor_id, url, path, device, rating, comment, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    site.id, fb.sid || null, fb.vid || null, fb.url, pageKey(fb.url), deviceForWidth(fb.vw), fb.rating, fb.comment || null, now,
+    `INSERT INTO feedback (site_id, session_id, visitor_id, url, path, device, rating, comment, element, viewport_w, client_ts, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    site.id, fb.sid || null, fb.vid || null, fb.url, pageKey(fb.url), deviceForWidth(fb.vw), fb.rating, fb.comment || null,
+    fb.element ? JSON.stringify(fb.element) : null, fb.vw || null, fb.ts ?? null, now,
+  );
+}
+
+const ANSWER_KEY = /^[a-z0-9]{1,16}$/i;
+
+function cleanAnswer(value: unknown): SurveyAnswer | undefined {
+  if (typeof value === 'number') return Number.isFinite(value) ? Math.round(value) : undefined;
+  if (typeof value === 'string') return value.trim().slice(0, 2000) || undefined;
+  if (Array.isArray(value)) {
+    const list = value.filter((v): v is string => typeof v === 'string').map((v) => v.slice(0, 100)).slice(0, 10);
+    return list.length ? list : undefined;
+  }
+  return undefined;
+}
+
+export function parseSurveyResponse(input: unknown): SurveyResponsePayload {
+  if (!input || typeof input !== 'object') throw badRequest('invalid payload');
+  const p = input as Record<string, unknown>;
+  if (typeof p.survey !== 'string' || !/^[a-z0-9]{6,32}$/i.test(p.survey)) throw badRequest('invalid survey');
+  const answers: Record<string, SurveyAnswer> = {};
+  const raw = p.answers && typeof p.answers === 'object' ? (p.answers as Record<string, unknown>) : {};
+  for (const [key, value] of Object.entries(raw).slice(0, 20)) {
+    const answer = cleanAnswer(value);
+    if (ANSWER_KEY.test(key) && answer !== undefined) answers[key] = answer;
+  }
+  if (!Object.keys(answers).length) throw badRequest('no answers');
+  return {
+    site: str(p.site, 64),
+    survey: p.survey,
+    sid: typeof p.sid === 'string' && ID_RE.test(p.sid) ? p.sid : '',
+    vid: typeof p.vid === 'string' && ID_RE.test(p.vid) ? p.vid : '',
+    url: str(p.url, 2000),
+    vw: clamp(int(p.vw), 0, 20000),
+    answers,
+    completed: p.completed !== false,
+  };
+}
+
+export function saveSurveyResponse(db: Database, site: Site, r: SurveyResponsePayload, now = Date.now()): void {
+  const survey = db.get('SELECT 1 AS x FROM surveys WHERE id = ? AND site_id = ?', r.survey, site.id);
+  if (!survey) throw new HttpError(404, 'unknown survey');
+  db.run(
+    `INSERT INTO survey_responses (survey_id, site_id, session_id, visitor_id, url, path, device, answers, completed, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    r.survey, site.id, r.sid || null, r.vid || null, r.url, pageKey(r.url), deviceForWidth(r.vw), JSON.stringify(r.answers), r.completed ? 1 : 0, now,
   );
 }

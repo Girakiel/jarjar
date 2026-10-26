@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { Database } from '../db';
 import { badRequest, clamp, int, notFound, rangeFromQuery, str } from '../http';
-import { normalizeDomain, type SiteRow, type SiteStore } from '../sites';
+import { cleanFeedbackConfig, normalizeDomain, type SiteRow, type SiteStore } from '../sites';
 
 type Params = { siteId: string };
 
@@ -46,7 +46,7 @@ export async function siteRoutes(app: FastifyInstance, opts: { db: Database; sit
   });
 
   app.patch<{ Params: Params }>('/sites/:siteId', async (request) => {
-    requireSite(request.params.siteId);
+    const site = requireSite(request.params.siteId);
     const b = (request.body ?? {}) as Record<string, unknown>;
     const fields: Partial<SiteRow> = {};
     if (b.name !== undefined) {
@@ -67,6 +67,19 @@ export async function siteRoutes(app: FastifyInstance, opts: { db: Database; sit
         if (!/^#[0-9a-f]{6}$/i.test(color)) throw badRequest('Color must look like #6e56cf');
         fields.feedback_color = color;
       }
+      // Appearance and targeting: merge onto the current settings so partial updates work.
+      const current = site.feedback;
+      const texts = fb.texts && typeof fb.texts === 'object' ? (fb.texts as Record<string, unknown>) : {};
+      fields.feedback_config = JSON.stringify(
+        cleanFeedbackConfig({
+          position: fb.position ?? current.position,
+          style: fb.style ?? current.style,
+          allowPick: fb.allowPick ?? current.allowPick,
+          texts: { ...current.texts, ...texts },
+          pages: fb.pages ?? current.pages,
+          devices: fb.devices ?? current.devices,
+        }),
+      );
     }
     return sites.update(request.params.siteId, fields);
   });

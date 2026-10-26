@@ -9,6 +9,8 @@ import { Home, NewSitePage } from './pages/Sites';
 import { OverviewPage } from './pages/Overview';
 import { RecordingsPage } from './pages/Recordings';
 import { SettingsPage } from './pages/Settings';
+import { SurveyEditorPage } from './pages/SurveyEditor';
+import { SurveyResultsPage, SurveysPage } from './pages/Surveys';
 import { TestPage } from './pages/Test';
 
 // The replayer pages pull in rrweb, so they're split out of the main bundle.
@@ -64,6 +66,9 @@ export function App() {
             <Route path="recordings/:sessionId" element={<Suspense fallback={<Spinner />}><ReplayPage /></Suspense>} />
             <Route path="heatmaps" element={<Suspense fallback={<Spinner />}><HeatmapsPage /></Suspense>} />
             <Route path="feedback" element={<FeedbackPage />} />
+            <Route path="surveys" element={<SurveysPage />} />
+            <Route path="surveys/:surveyId" element={<SurveyResultsPage />} />
+            <Route path="surveys/:surveyId/edit" element={<SurveyEditorPage />} />
             <Route path="test" element={<TestPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>

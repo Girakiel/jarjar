@@ -172,6 +172,7 @@ export async function sessionRoutes(app: FastifyInstance, opts: { db: Database }
     const sessions = db.transaction(() => {
       const ids = `SELECT s.id FROM sessions s WHERE s.site_id = ? AND EXISTS (SELECT 1 FROM json_each(s.tags) WHERE value = '${TEST_TAG}')`;
       db.run(`DELETE FROM feedback WHERE site_id = ? AND session_id IN (${ids})`, siteId, siteId);
+      db.run(`DELETE FROM survey_responses WHERE site_id = ? AND session_id IN (${ids})`, siteId, siteId);
       db.run("DELETE FROM snapshots WHERE site_id = ? AND path = '/demo'", siteId);
       return db.run(`DELETE FROM sessions WHERE id IN (${ids})`, siteId).changes;
     });

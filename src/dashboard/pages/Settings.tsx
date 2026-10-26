@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api, type Site } from '../api';
+import { FeedbackSettings } from '../components/FeedbackSettings';
 import { Icon } from '../components/Icon';
 import { useSite } from '../components/Layout';
 import { CodeBlock, Snippet } from '../components/Snippet';
@@ -47,7 +48,6 @@ export function SettingsPage() {
           sampleRate: form.sampleRate,
           maskAllText: form.maskAllText,
           respectDnt: form.respectDnt,
-          feedback: { enabled: form.feedbackEnabled, title: form.feedbackTitle, color: form.feedbackColor },
         },
       });
       setSaved(true);
@@ -123,24 +123,6 @@ export function SettingsPage() {
             <Toggle checked={form.maskAllText} onChange={(v) => update('maskAllText', v)} label="Mask all text in recordings" hint="Replaces every piece of text with asterisks. Form inputs are always masked." />
             <Toggle checked={form.respectDnt} onChange={(v) => update('respectDnt', v)} label="Respect Do Not Track" hint="Skip visitors whose browser sends Do Not Track or Global Privacy Control." />
 
-            <hr style={{ border: 0, borderTop: '1px solid var(--border)', width: '100%', margin: 0 }} />
-
-            <Toggle checked={form.feedbackEnabled} onChange={(v) => update('feedbackEnabled', v)} label="Show the feedback widget" hint='Adds a small "Feedback" tab on the side of every tracked page.' />
-            {form.feedbackEnabled && (
-              <>
-                <div className="field">
-                  <label htmlFor="fb-title">Question</label>
-                  <input id="fb-title" type="text" value={form.feedbackTitle} onChange={(e) => update('feedbackTitle', e.target.value)} />
-                </div>
-                <div className="field">
-                  <label htmlFor="fb-color">Color</label>
-                  <div className="color-input">
-                    <input id="fb-color" type="color" value={form.feedbackColor} onChange={(e) => update('feedbackColor', e.target.value)} />
-                    <code>{form.feedbackColor}</code>
-                  </div>
-                </div>
-              </>
-            )}
             <ErrorBox error={error} />
             <div className="row">
               <button className="btn btn-primary" type="submit" disabled={saving}>
@@ -154,6 +136,8 @@ export function SettingsPage() {
             </div>
           </div>
         </form>
+
+        <FeedbackSettings />
 
         <div className="card">
           <div className="card-header">
@@ -186,9 +170,6 @@ interface FormState {
   sampleRate: number;
   maskAllText: boolean;
   respectDnt: boolean;
-  feedbackEnabled: boolean;
-  feedbackTitle: string;
-  feedbackColor: string;
 }
 
 function toForm(site: Site): FormState {
@@ -198,8 +179,5 @@ function toForm(site: Site): FormState {
     sampleRate: site.sampleRate,
     maskAllText: site.maskAllText,
     respectDnt: site.respectDnt,
-    feedbackEnabled: site.feedback.enabled,
-    feedbackTitle: site.feedback.title,
-    feedbackColor: site.feedback.color,
   };
 }

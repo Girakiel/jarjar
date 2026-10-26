@@ -12,6 +12,7 @@ import { heatmapRoutes } from './routes/heatmaps';
 import { ingestRoutes } from './routes/ingest';
 import { sessionRoutes } from './routes/sessions';
 import { siteRoutes } from './routes/sites';
+import { surveyRoutes } from './routes/surveys';
 import { SiteStore } from './sites';
 
 declare module 'fastify' {
@@ -71,6 +72,7 @@ export async function buildApp({ config, db: providedDb, logger = true }: AppOpt
       await api.register(sessionRoutes, { db });
       await api.register(heatmapRoutes, { db });
       await api.register(feedbackRoutes, { db });
+      await api.register(surveyRoutes, { db, sites });
     },
     { prefix: '/api' },
   );

@@ -112,7 +112,7 @@ describe('tracking', () => {
     assert.equal(config.statusCode, 200);
     assert.equal(config.headers['access-control-allow-origin'], '*');
     assert.equal(config.json().enabled, true);
-    assert.equal(config.json().feedback.enabled, true);
+    assert.equal(config.json().feedback.title, 'How would you rate your experience?');
   });
 
   it('rejects unknown sites and disallowed origins', async () => {
@@ -267,6 +267,125 @@ describe('tracking', () => {
     assert.equal(deleted, 1);
     assert.equal(db.get<{ n: number }>('SELECT COUNT(*) AS n FROM clicks')!.n, 0);
     assert.equal(db.get<{ n: number }>('SELECT COUNT(*) AS n FROM recording_chunks')!.n, 0);
+  });
+});
+
+describe('feedback widget and surveys', () => {
+  let siteId = '';
+  const ORIGIN = { 'content-type': 'text/plain', origin: 'https://www.acme.test' };
+  const post = (url: string, body: unknown) => app.inject({ method: 'POST', url, payload: JSON.stringify(body), headers: ORIGIN });
+  const trackerConfig = async () => (await app.inject({ method: 'GET', url: `/i/config?site=${siteId}`, headers: { origin: 'https://www.acme.test' } })).json();
+
+  before(async () => {
+    // The retention test above expires every login token, so sign in again.
+    const res = await api('POST', '/api/auth/login', { email: 'owner@example.com', password: 'correct horse' });
+    cookie = String(res.headers['set-cookie']).split(';')[0];
+  });
+
+  it('saves widget appearance and targeting, keeping defaults for the rest', async () => {
+    siteId = (await api('POST', '/api/sites', { name: 'Acme', domains: 'acme.test' })).json().id;
+    const res = await api('PATCH', `/api/sites/${siteId}`, {
+      feedback: { enabled: true, position: 'left', style: 'stars', texts: { tab: 'Visszajelzés' }, pages: '/pricing\n/blog/*', devices: ['desktop', 'nope'] },
+    });
+    assert.equal(res.statusCode, 200, res.body);
+    const fb = res.json().feedback;
+    assert.equal(fb.position, 'left');
+    assert.equal(fb.style, 'stars');
+    assert.equal(fb.texts.tab, 'Visszajelzés');
+    assert.equal(fb.texts.send, 'Send feedback');
+    assert.deepEqual(fb.pages, ['/pricing', '/blog/*']);
+    assert.deepEqual(fb.devices, ['desktop']);
+
+    // A later partial update keeps earlier choices.
+    const again = (await api('PATCH', `/api/sites/${siteId}`, { feedback: { texts: { send: 'Küldés' } } })).json().feedback;
+    assert.equal(again.texts.tab, 'Visszajelzés');
+    assert.equal(again.texts.send, 'Küldés');
+    assert.equal(again.position, 'left');
+
+    const config = await trackerConfig();
+    assert.equal(config.feedback.position, 'left');
+    assert.equal(config.feedback.enabled, undefined);
+    assert.deepEqual(config.surveys, []);
+  });
+
+  it('stores the element a visitor pointed at', async () => {
+    const res = await post('/i/feedback', {
+      site: siteId, sid: SID, vid: VID, url: 'https://www.acme.test/pricing', vw: 1280, ts: 1700000000000, rating: 2,
+      comment: 'This button does nothing', element: { s: 'body>main>button', x: 100, y: 840, w: 220, h: 48 },
+    });
+    assert.equal(res.statusCode, 204, res.body);
+    const item = (await api('GET', `/api/sites/${siteId}/feedback`)).json().items[0];
+    assert.deepEqual(item.element, { s: 'body>main>button', x: 100, y: 840, w: 220, h: 48 });
+    assert.equal(item.clientTs, 1700000000000);
+    assert.equal(item.viewportW, 1280);
+  });
+
+  let survey: { id: string; definition: { questions: Array<{ id: string; type: string; options: string[] }> } };
+
+  it('creates surveys from templates, inactive until switched on', async () => {
+    const res = await api('POST', `/api/sites/${siteId}/surveys`, { template: 'nps' });
+    survey = res.json();
+    assert.equal(res.json().name, 'Net Promoter Score');
+    assert.equal(res.json().active, false);
+    assert.deepEqual(survey.definition.questions.map((q) => q.type), ['nps', 'text']);
+    assert.deepEqual((await trackerConfig()).surveys, []);
+
+    // Previewing works for inactive surveys.
+    const preview = await app.inject({ method: 'GET', url: `/i/survey?site=${siteId}&id=${survey.id}`, headers: { origin: 'https://www.acme.test' } });
+    assert.equal(preview.json().id, survey.id);
+
+    const on = await api('PATCH', `/api/surveys/${survey.id}`, { active: true, definition: { ...survey.definition, pages: ['/pricing'] } });
+    assert.equal(on.json().active, true);
+    const live = (await trackerConfig()).surveys;
+    assert.equal(live.length, 1);
+    assert.deepEqual(live[0].pages, ['/pricing']);
+  });
+
+  it('cleans up invalid survey definitions', async () => {
+    const res = await api('PATCH', `/api/surveys/${survey.id}`, {
+      definition: {
+        questions: [...survey.definition.questions, { type: 'weird', text: '' }, { type: 'single', text: 'Pick one', options: ['Only'] }],
+        trigger: { type: 'scroll', value: 500 },
+      },
+    });
+    const def = res.json().definition;
+    assert.deepEqual(def.questions.map((q: { type: string }) => q.type), ['nps', 'text', 'text', 'single']);
+    assert.equal(def.questions[2].text, 'Untitled question');
+    assert.deepEqual(def.questions[3].options, ['Only', 'Option 2']);
+    assert.deepEqual(def.trigger, { type: 'scroll', value: 100 });
+    assert.equal(def.questions[0].id, survey.definition.questions[0].id);
+  });
+
+  it('collects responses and views, and summarises them', async () => {
+    const [nps, text] = survey.definition.questions;
+    const base = { site: siteId, survey: survey.id, sid: SID, vid: VID, url: 'https://www.acme.test/pricing', vw: 1280 };
+    assert.equal((await post('/i/survey', { ...base, answers: { [nps.id]: 10, [text.id]: 'Fast and simple' } })).statusCode, 204);
+    assert.equal((await post('/i/survey', { ...base, answers: { [nps.id]: 3 }, completed: false })).statusCode, 204);
+    assert.equal((await post('/i/survey', { ...base, answers: { [nps.id]: 8 } })).statusCode, 204);
+    await post('/i/survey/view', { site: siteId, survey: survey.id });
+    await post('/i/survey/view', { site: siteId, survey: survey.id });
+    assert.equal((await post('/i/survey', { ...base, survey: 'aaaaaaaaaaaa', answers: { x: 1 } })).statusCode, 404);
+
+    const results = (await api('GET', `/api/surveys/${survey.id}/results`)).json();
+    assert.equal(results.total, 3);
+    assert.equal(results.completed, 2);
+    assert.deepEqual(results.allTime, { views: 2, responses: 3 });
+    const npsSummary = results.questions[0];
+    assert.equal(npsSummary.answered, 3);
+    assert.equal(npsSummary.promoters, 1);
+    assert.equal(npsSummary.passives, 1);
+    assert.equal(npsSummary.detractors, 1);
+    assert.equal(npsSummary.score, 0);
+    assert.equal(results.responses.find((r: { answers: Record<string, unknown> }) => r.answers[text.id]).answers[text.id], 'Fast and simple');
+
+    const list = (await api('GET', `/api/sites/${siteId}/surveys`)).json();
+    assert.equal(list[0].responses, 3);
+  });
+
+  it('removes a deleted survey from the tracker config', async () => {
+    assert.equal((await api('DELETE', `/api/surveys/${survey.id}`)).statusCode, 200);
+    assert.deepEqual((await trackerConfig()).surveys, []);
+    assert.equal(db.get<{ n: number }>('SELECT COUNT(*) AS n FROM survey_responses')!.n, 0);
   });
 });
 

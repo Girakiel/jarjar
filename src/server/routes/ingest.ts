@@ -2,8 +2,9 @@
 import zlib from 'node:zlib';
 import { promisify } from 'node:util';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { ingest, parseCollectPayload, parseFeedbackPayload, saveFeedback } from '../ingest';
-import { badRequest, HttpError, str } from '../http';
+import { ingest, parseCollectPayload, parseFeedbackPayload, parseSurveyResponse, saveFeedback, saveSurveyResponse } from '../ingest';
+import { badRequest, HttpError, notFound, str } from '../http';
+import { parseSurveyContent, type SurveyRow } from '../surveys';
 import { originAllowed, trackerConfig, type Site, type SiteStore } from '../sites';
 import { parseUserAgent } from '../ua';
 import type { Database } from '../db';
@@ -77,7 +78,7 @@ export async function ingestRoutes(app: FastifyInstance, opts: { db: Database; s
     const key = str((request.query as Record<string, unknown>).site, 64);
     const site = siteFor(request, key);
     reply.header('Cache-Control', 'public, max-age=60');
-    return trackerConfig(site);
+    return trackerConfig(site, sites.activeSurveys(site.id));
   });
 
   app.post('/collect', async (request, reply) => {
@@ -93,6 +94,29 @@ export async function ingestRoutes(app: FastifyInstance, opts: { db: Database; s
     const feedback = parseFeedbackPayload(await readJson(request));
     const site = siteFor(request, feedback.site);
     saveFeedback(db, site, feedback);
+    return reply.code(204).send();
+  });
+
+  // A single survey, active or not, for previewing it from the dashboard's test page.
+  app.get('/survey', async (request) => {
+    const q = request.query as Record<string, unknown>;
+    const site = siteFor(request, str(q.site, 64));
+    const row = db.get<SurveyRow>('SELECT * FROM surveys WHERE id = ? AND site_id = ?', str(q.id, 32), site.id);
+    if (!row) throw notFound('unknown survey');
+    return { id: row.id, ...parseSurveyContent(row.definition) };
+  });
+
+  app.post('/survey', async (request, reply) => {
+    const response = parseSurveyResponse(await readJson(request));
+    const site = siteFor(request, response.site);
+    saveSurveyResponse(db, site, response);
+    return reply.code(204).send();
+  });
+
+  app.post('/survey/view', async (request, reply) => {
+    const body = (await readJson(request)) as Record<string, unknown>;
+    const site = siteFor(request, str(body.site, 64));
+    db.run('UPDATE surveys SET views = views + 1 WHERE id = ? AND site_id = ?', str(body.survey, 32), site.id);
     return reply.code(204).send();
   });
 }

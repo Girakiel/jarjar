@@ -1,9 +1,13 @@
+import { lazy, Suspense, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { api, useApi, type FeedbackList } from '../api';
+import { api, useApi, type FeedbackItem, type FeedbackList } from '../api';
 import { DeviceIcon, Icon } from '../components/Icon';
 import { useSite } from '../components/Layout';
 import { BarList, DaysPicker, Empty, ErrorBox, PageHeader, Segmented, Spinner, useDays } from '../components/ui';
 import { formatDateTime, formatNumber, RATING_EMOJI, RATING_LABEL } from '../format';
+
+// Pulls in rrweb's replayer, so it's loaded only when opened.
+const ElementModal = lazy(() => import('../components/ElementModal').then((m) => ({ default: m.ElementModal })));
 
 export function FeedbackPage() {
   const { site } = useSite();
@@ -12,6 +16,11 @@ export function FeedbackPage() {
   const rating = params.get('rating') ?? '';
   const { data, error, reload } = useApi<FeedbackList>(`/sites/${site.id}/feedback?days=${days}${rating ? `&rating=${rating}` : ''}`);
   const search = `?days=${days}`;
+  const [shown, setShown] = useState<FeedbackItem | null>(null);
+
+  // Opens the recording a few seconds before the feedback was sent.
+  const recordingLink = (item: FeedbackItem) =>
+    item.sessionId && item.hasRecording ? `/sites/${site.id}/recordings/${item.sessionId}${search}${item.clientTs ? `&at=${item.clientTs}` : ''}` : null;
 
   const setRating = (value: string) => {
     const next = new URLSearchParams(params);
@@ -97,12 +106,20 @@ export function FeedbackPage() {
                       </span>
                       <span>·</span>
                       <span>{formatDateTime(item.createdAt)}</span>
-                      {item.sessionId && item.hasRecording ? (
+                      {recordingLink(item) && (
                         <>
                           <span>·</span>
-                          <Link to={`/sites/${site.id}/recordings/${item.sessionId}${search}`}>Watch recording</Link>
+                          <Link to={recordingLink(item)!}>Watch recording</Link>
                         </>
-                      ) : null}
+                      )}
+                      {item.element && (
+                        <>
+                          <span>·</span>
+                          <button type="button" className="link-button" onClick={() => setShown(item)}>
+                            📍 Show on page
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                   <button type="button" className="btn btn-ghost btn-sm btn-icon" aria-label="Delete response" onClick={() => remove(item.id)}>
@@ -113,6 +130,11 @@ export function FeedbackPage() {
             )}
           </div>
         </div>
+      )}
+      {shown && (
+        <Suspense fallback={null}>
+          <ElementModal siteId={site.id} item={shown} recordingLink={recordingLink(shown)} onClose={() => setShown(null)} />
+        </Suspense>
       )}
     </>
   );
