@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Acme Coffee — jarjar demo page</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; font: 16px/1.6 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #2b2118; background: #fffaf3; }
+      header { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; padding: 14px 28px; background: #fffaf3ee; backdrop-filter: blur(6px); border-bottom: 1px solid #efe3d3; }
+      .logo { font-weight: 800; font-size: 20px; letter-spacing: -0.02em; }
+      nav a { margin-left: 22px; color: #6b5640; text-decoration: none; font-weight: 500; }
+      nav a:hover { color: #2b2118; }
+      .hero { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 40px; align-items: center; max-width: 1100px; margin: 0 auto; padding: 80px 28px; }
+      .hero h1 { font-size: 52px; line-height: 1.05; letter-spacing: -0.03em; margin: 0 0 18px; }
+      .hero p { font-size: 19px; color: #6b5640; margin: 0 0 28px; }
+      .cta { display: inline-block; background: #c2410c; color: white; padding: 14px 26px; border-radius: 10px; font-weight: 600; text-decoration: none; border: 0; font-size: 16px; cursor: pointer; }
+      .cta.secondary { background: transparent; color: #c2410c; border: 2px solid #c2410c; margin-left: 10px; }
+      .cup { aspect-ratio: 1; border-radius: 28px; background: radial-gradient(circle at 30% 30%, #f4c48b, #c2410c 55%, #5c1d04); display: grid; place-items: center; font-size: 120px; box-shadow: 0 30px 60px #c2410c33; }
+      section { max-width: 1100px; margin: 0 auto; padding: 60px 28px; }
+      h2 { font-size: 34px; letter-spacing: -0.02em; margin: 0 0 24px; }
+      .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+      .card { background: white; border: 1px solid #efe3d3; border-radius: 16px; padding: 24px; }
+      .card h3 { margin: 0 0 6px; }
+      .price { font-size: 30px; font-weight: 800; margin: 10px 0; }
+      .card button { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid #c2410c; background: white; color: #c2410c; font-weight: 600; cursor: pointer; font-size: 15px; }
+      .card.featured { border: 2px solid #c2410c; }
+      .card.featured button { background: #c2410c; color: white; }
+      .fake-link { color: #c2410c; text-decoration: underline dotted; cursor: pointer; }
+      form { display: grid; gap: 12px; max-width: 460px; }
+      input, textarea { font: inherit; padding: 12px 14px; border-radius: 10px; border: 1px solid #e2d3bf; background: white; }
+      footer { text-align: center; padding: 40px; color: #8a755e; border-top: 1px solid #efe3d3; margin-top: 40px; }
+      .banner { background: #2b2118; color: #fffaf3; text-align: center; padding: 8px 16px; font-size: 14px; }
+      .banner code { background: #ffffff22; padding: 1px 6px; border-radius: 4px; }
+      @media (max-width: 800px) { .hero, .grid { grid-template-columns: 1fr; } .hero h1 { font-size: 38px; } nav { display: none; } }
+    </style>
+    <script>
+      // Loads the tracker for the site key given in ?site=..., using this server as the jarjar host.
+      (function () {
+        var site = new URLSearchParams(location.search).get('site');
+        if (!site) return;
+        var s = document.createElement('script');
+        s.async = true;
+        s.src = '/t.js';
+        s.dataset.site = site;
+        document.head.appendChild(s);
+      })();
+    </script>
+  </head>
+  <body>
+    <div class="banner">This is a demo page for <strong>jarjar</strong>. Click, scroll and fill things in — then watch the recording in your dashboard.</div>
+    <header>
+      <div class="logo">☕ Acme Coffee</div>
+      <nav>
+        <a href="#menu">Menu</a>
+        <a href="#pricing">Subscriptions</a>
+        <a href="#contact">Contact</a>
+      </nav>
+    </header>
+
+    <div class="hero">
+      <div>
+        <h1>Fresh roasted coffee, delivered weekly.</h1>
+        <p>Single-origin beans from small farms, roasted to order and shipped the same day.</p>
+        <a class="cta" href="#pricing" id="hero-cta">Start a subscription</a>
+        <button class="cta secondary" type="button" id="broken-button">Watch the video</button>
+      </div>
+      <div class="cup" aria-hidden="true">☕</div>
+    </div>
+
+    <section id="menu">
+      <h2>This week's roasts</h2>
+      <div class="grid">
+        <div class="card"><h3>Ethiopia Guji</h3><p>Blueberry, jasmine, honey. A bright and floral light roast.</p><span class="fake-link">Tasting notes</span></div>
+        <div class="card"><h3>Colombia Huila</h3><p>Caramel, red apple, cocoa. Balanced medium roast for every brew method.</p><span class="fake-link">Tasting notes</span></div>
+        <div class="card"><h3>Sumatra Mandheling</h3><p>Cedar, dark chocolate, spice. Full-bodied dark roast.</p><span class="fake-link">Tasting notes</span></div>
+      </div>
+    </section>
+
+    <section id="pricing">
+      <h2>Subscriptions</h2>
+      <div class="grid">
+        <div class="card"><h3>Taster</h3><div class="price">$14/mo</div><p>One 250g bag every month.</p><button type="button" class="plan" data-plan="taster">Choose Taster</button></div>
+        <div class="card featured"><h3>Regular</h3><div class="price">$26/mo</div><p>Two bags a month, free shipping.</p><button type="button" class="plan" data-plan="regular">Choose Regular</button></div>
+        <div class="card"><h3>Office</h3><div class="price">$79/mo</div><p>2kg a month for teams that run on coffee.</p><button type="button" class="plan" data-plan="office">Choose Office</button></div>
+      </div>
+    </section>
+
+    <section id="contact">
+      <h2>Questions?</h2>
+      <form onsubmit="event.preventDefault(); this.querySelector('button').textContent = 'Thanks! We\'ll be in touch.'; window.jarjar && jarjar('event', 'contact_form_sent');">
+        <input type="text" name="name" placeholder="Your name" />
+        <input type="email" name="email" placeholder="you@example.com" />
+        <textarea name="message" rows="4" placeholder="Your message (inputs are masked in recordings)"></textarea>
+        <button class="cta" type="submit">Send message</button>
+      </form>
+    </section>
+
+    <footer>© Acme Coffee — a fictional shop for trying out jarjar. Session id is stored in sessionStorage.</footer>
+
+    <script>
+      document.querySelectorAll('.plan').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          btn.textContent = 'Added to cart ✓';
+          window.jarjar && jarjar('event', 'plan_selected');
+        });
+      });
+      // A button that throws, to demo rage clicks and error tracking.
+      document.getElementById('broken-button').addEventListener('click', function () {
+        throw new Error('Video player failed to load');
+      });
+    </script>
+  </body>
+</html>
