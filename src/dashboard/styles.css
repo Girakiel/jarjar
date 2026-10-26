@@ -2191,3 +2191,126 @@ details.wording .hint {
 .funnel-edit-step select {
   width: 150px;
 }
+
+/* ---------- sites ---------- */
+
+.nav-top {
+  margin-bottom: -6px;
+}
+
+.site-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.site-card {
+  display: flex;
+  flex-direction: column;
+  padding: 18px;
+  gap: 16px;
+}
+
+.site-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.site-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.site-card-visits {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+}
+
+.site-card-number {
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.sparkline {
+  flex: 1;
+  height: 36px;
+  min-width: 0;
+}
+
+.sparkline rect.on {
+  fill: var(--accent);
+}
+
+.sparkline rect.off {
+  fill: var(--border);
+}
+
+.site-card-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px 12px;
+  margin: 0;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--border);
+}
+
+.site-card-stats dt {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.site-card-stats dd {
+  margin: 0;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.site-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.site-delete {
+  margin-left: auto;
+}
+
+.site-delete:hover {
+  color: var(--danger);
+}
+
+.dialog {
+  width: min(480px, 100%);
+}
+
+/* ---------- pages ---------- */
+
+.pages-table th .sort {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.pages-table th .sort:hover {
+  color: var(--text);
+}
+
+.page-cell {
+  max-width: 320px;
+}
+
+.page-actions {
+  gap: 2px;
+  justify-content: flex-end;
+}

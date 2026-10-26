@@ -7,7 +7,8 @@ import { AuthPage } from './pages/Auth';
 import { FeedbackPage } from './pages/Feedback';
 import { InsightsPage } from './pages/Insights';
 import { JourneysPage } from './pages/Journeys';
-import { Home, NewSitePage } from './pages/Sites';
+import { PagesPage } from './pages/Pages';
+import { Home, NewSitePage, SitesPage } from './pages/Sites';
 import { OverviewPage } from './pages/Overview';
 import { RecordingsPage } from './pages/Recordings';
 import { SettingsPage } from './pages/Settings';
@@ -62,9 +63,13 @@ export function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/sites/new" element={<NewSitePage />} />
+          <Route path="/sites" element={<Layout />}>
+            <Route index element={<SitesPage />} />
+          </Route>
           <Route path="/sites/:siteId" element={<Layout />}>
             <Route index element={<OverviewPage />} />
             <Route path="insights" element={<InsightsPage />} />
+            <Route path="pages" element={<PagesPage />} />
             <Route path="journeys" element={<JourneysPage />} />
             <Route path="recordings" element={<RecordingsPage />} />
             <Route path="recordings/:sessionId" element={<Suspense fallback={<Spinner />}><ReplayPage /></Suspense>} />

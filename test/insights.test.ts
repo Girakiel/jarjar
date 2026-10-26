@@ -232,3 +232,39 @@ describe('insights', () => {
     assert.equal(res.insights.find((i: Insight) => i.key === key).dismissed, false);
   });
 });
+
+describe('site management', () => {
+  it('summarises every site for the Sites page', async () => {
+    const list = (await api('GET', '/api/sites')).json();
+    const shop = list.find((s: { id: string }) => s.id === site.id);
+    assert.equal(shop.stats.sessions, 6);
+    assert.equal(shop.stats.visitors, 6);
+    assert.equal(shop.stats.pageviews, 14);
+    assert.equal(shop.stats.pages, 4);
+    assert.equal(shop.stats.daily.length, 14);
+    assert.equal(shop.stats.daily.reduce((a: number, b: number) => a + b, 0), 6);
+    assert.ok(shop.stats.storageBytes > 0);
+    assert.ok(shop.lastSeenAt);
+  });
+
+  it('reports per-page metrics', async () => {
+    const pages = (await api('GET', `/api/sites/${site.id}/pages`)).json();
+    assert.deepEqual(pages.map((p: { path: string }) => p.path), ['/', '/pricing', '/signup', '/thanks']);
+    const home = pages[0];
+    assert.equal(home.views, 6);
+    assert.equal(home.entries, 6);
+    assert.equal(home.bounceRate, 1 / 6);
+    assert.equal(home.exitRate, 1 / 6);
+    const pricing = pages[1];
+    assert.equal(pricing.visitors, 5);
+    assert.equal(pricing.exitRate, 3 / 5);
+    assert.equal(pricing.clicks, 9);
+    assert.equal(pricing.rageClicks, 2);
+    assert.equal(pricing.deadClicks, 3);
+    assert.equal(pricing.avgTime, 2000);
+    assert.equal(pricing.rating, 1);
+    assert.equal(pricing.ratings, 2);
+    assert.deepEqual(pricing.devices, []); // these test visits carry no full page snapshots
+    assert.equal(pages[2].errors, 2);
+  });
+});

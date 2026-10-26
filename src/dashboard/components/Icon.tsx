@@ -34,6 +34,8 @@ const PATHS = {
   journeys: <><circle cx="6" cy="19" r="3" /><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15" /><circle cx="18" cy="5" r="3" /></>,
   funnel: <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />,
   exit: <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" x2="9" y1="12" y2="12" /></>,
+  sites: <><rect width="7" height="7" x="3" y="3" rx="1" /><rect width="7" height="7" x="14" y="3" rx="1" /><rect width="7" height="7" x="14" y="14" rx="1" /><rect width="7" height="7" x="3" y="14" rx="1" /></>,
+  globe: <><circle cx="12" cy="12" r="10" /><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" /><path d="M2 12h20" /></>,
   jar: <><path d="M8 2h8" /><path d="M9 2v2.34a1.5 1.5 0 0 1-.77 1.31A6 6 0 0 0 5 11v8a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3v-8a6 6 0 0 0-3.23-5.35A1.5 1.5 0 0 1 15 4.34V2" /><path d="M5 12h14" /></>,
 } as const;
 

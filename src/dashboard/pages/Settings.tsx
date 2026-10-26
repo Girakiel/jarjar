@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api, type Site } from '../api';
 import { FeedbackSettings } from '../components/FeedbackSettings';
+import { DeleteSiteDialog } from '../components/SiteDialogs';
 import { Icon } from '../components/Icon';
 import { useSite } from '../components/Layout';
 import { CodeBlock, Snippet } from '../components/Snippet';
@@ -59,17 +60,7 @@ export function SettingsPage() {
     }
   };
 
-  const remove = async () => {
-    const answer = prompt(`This deletes "${site.name}" and all of its recordings, heatmaps and feedback.\nType the site name to confirm:`);
-    if (answer !== site.name) return;
-    await api(`/sites/${site.id}`, { method: 'DELETE' });
-    try {
-      localStorage.removeItem('jj_site');
-    } catch {
-      /* ignore */
-    }
-    navigate('/');
-  };
+  const [deleting, setDeleting] = useState(false);
 
   return (
     <>
@@ -154,12 +145,13 @@ export function SettingsPage() {
           </div>
           <div className="card-body row" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
             <span className="muted">Permanently removes the site and all data collected for it.</span>
-            <button type="button" className="btn btn-danger" onClick={remove}>
+            <button type="button" className="btn btn-danger" onClick={() => setDeleting(true)}>
               <Icon name="trash" /> Delete site
             </button>
           </div>
         </div>
       </div>
+      {deleting && <DeleteSiteDialog site={site} onClose={() => setDeleting(false)} onDeleted={() => { reloadSites(); navigate('/sites'); }} />}
     </>
   );
 }

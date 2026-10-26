@@ -83,7 +83,36 @@ export interface Site {
   feedback: FeedbackWidgetConfig & { enabled: boolean };
   createdAt: number;
   lastSeenAt: number | null;
-  sessions30d?: number;
+  stats?: SiteStats; // included in the sites list
+}
+
+export interface SiteStats {
+  sessions: number; // last 30 days
+  visitors: number;
+  pageviews: number;
+  pages: number;
+  storageBytes: number; // all recordings kept
+  activeSurveys: number;
+  daily: number[]; // visits per day, last 14 days, oldest first
+}
+
+export interface PageStats {
+  path: string;
+  title: string | null;
+  views: number;
+  visitors: number;
+  avgTime: number | null;
+  avgScroll: number | null;
+  entries: number;
+  bounceRate: number | null;
+  exitRate: number;
+  clicks: number;
+  rageClicks: number;
+  deadClicks: number;
+  errors: number;
+  rating: number | null;
+  ratings: number;
+  devices: Device[];
 }
 
 export interface NameCount {

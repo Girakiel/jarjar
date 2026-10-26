@@ -5,14 +5,26 @@ import { useAuth } from '../App';
 import { Icon, type IconName } from './Icon';
 import { Empty, ErrorBox, Spinner } from './ui';
 
-interface SiteContextValue {
-  site: Site;
+interface SitesContextValue {
   sites: Site[];
   reloadSites: () => void;
 }
 
+interface SiteContextValue extends SitesContextValue {
+  site: Site;
+}
+
+const SitesContext = createContext<SitesContextValue | null>(null);
 const SiteContext = createContext<SiteContextValue | null>(null);
 
+/** All sites, with their 30-day stats. Available on every page inside the layout. */
+export function useSites(): SitesContextValue {
+  const ctx = useContext(SitesContext);
+  if (!ctx) throw new Error('useSites outside of the layout');
+  return ctx;
+}
+
+/** The site whose pages are being viewed. */
 export function useSite(): SiteContextValue {
   const ctx = useContext(SiteContext);
   if (!ctx) throw new Error('useSite outside of a site route');
@@ -33,6 +45,7 @@ export function Brand() {
 const NAV: Array<{ to: string; label: string; icon: IconName; end?: boolean }> = [
   { to: '', label: 'Overview', icon: 'overview', end: true },
   { to: 'insights', label: 'Insights', icon: 'insights' },
+  { to: 'pages', label: 'Pages', icon: 'page' },
   { to: 'recordings', label: 'Recordings', icon: 'recordings' },
   { to: 'heatmaps', label: 'Heatmaps', icon: 'heatmaps' },
   { to: 'journeys', label: 'Journeys', icon: 'journeys' },
@@ -64,61 +77,80 @@ export function Layout() {
   const days = new URLSearchParams(location.search).get('days');
   const search = days ? `?days=${days}` : '';
 
+  let content;
+  if (error) content = <ErrorBox error={error} />;
+  else if (!sites) content = <Spinner />;
+  else if (!siteId) content = <Outlet />;
+  else if (!site) {
+    content = (
+      <Empty icon="error" title="Site not found">
+        <p>It may have been deleted.</p>
+        <Link className="btn" to="/sites">
+          See all sites
+        </Link>
+      </Empty>
+    );
+  } else {
+    content = (
+      <SiteContext.Provider value={{ site, sites, reloadSites: reload }}>
+        <Outlet />
+      </SiteContext.Provider>
+    );
+  }
+
   return (
-    <div className="app">
-      <aside className="sidebar">
-        <Brand />
-        {sites && (
-          <select
-            className="site-select"
-            aria-label="Site"
-            value={siteId}
-            onChange={(e) => navigate(e.target.value === '__new' ? '/sites/new' : `/sites/${e.target.value}${search}`)}
-          >
-            {sites.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-            <option value="__new">+ Add a site…</option>
-          </select>
-        )}
-        <nav className="nav">
-          {NAV.map((item) => (
-            <NavLink key={item.label} to={{ pathname: `/sites/${siteId}${item.to ? `/${item.to}` : ''}`, search }} end={item.end}>
-              <Icon name={item.icon} />
-              <span>{item.label}</span>
+    <SitesContext.Provider value={{ sites: sites ?? [], reloadSites: reload }}>
+      <div className="app">
+        <aside className="sidebar">
+          <Brand />
+          <nav className="nav nav-top">
+            <NavLink to={{ pathname: '/sites', search }} end>
+              <Icon name="sites" />
+              <span>All sites</span>
             </NavLink>
-          ))}
-        </nav>
-        <div className="sidebar-footer">
-          <Icon name="user" />
-          <span className="email" title={user.email}>
-            {user.email}
-          </span>
-          <button type="button" className="btn btn-ghost btn-sm btn-icon" title="Sign out" aria-label="Sign out" onClick={logout}>
-            <Icon name="logout" />
-          </button>
-        </div>
-      </aside>
-      <main className="main">
-        {error ? (
-          <ErrorBox error={error} />
-        ) : !sites ? (
-          <Spinner />
-        ) : !site ? (
-          <Empty icon="error" title="Site not found">
-            <p>It may have been deleted.</p>
-            <Link className="btn" to="/">
-              Go to your sites
-            </Link>
-          </Empty>
-        ) : (
-          <SiteContext.Provider value={{ site, sites, reloadSites: reload }}>
-            <Outlet />
-          </SiteContext.Provider>
-        )}
-      </main>
-    </div>
+          </nav>
+          {sites && sites.length > 0 && (
+            <select
+              className="site-select"
+              aria-label="Site"
+              value={siteId ?? ''}
+              onChange={(e) => navigate(e.target.value === '__new' ? '/sites?add=1' : `/sites/${e.target.value}${search}`)}
+            >
+              {!siteId && (
+                <option value="" disabled>
+                  Choose a site…
+                </option>
+              )}
+              {sites.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+              <option value="__new">+ Add a site…</option>
+            </select>
+          )}
+          {siteId && (
+            <nav className="nav">
+              {NAV.map((item) => (
+                <NavLink key={item.label} to={{ pathname: `/sites/${siteId}${item.to ? `/${item.to}` : ''}`, search }} end={item.end}>
+                  <Icon name={item.icon} />
+                  <span>{item.label}</span>
+                </NavLink>
+              ))}
+            </nav>
+          )}
+          <div className="sidebar-footer">
+            <Icon name="user" />
+            <span className="email" title={user.email}>
+              {user.email}
+            </span>
+            <button type="button" className="btn btn-ghost btn-sm btn-icon" title="Sign out" aria-label="Sign out" onClick={logout}>
+              <Icon name="logout" />
+            </button>
+          </div>
+        </aside>
+        <main className="main">{content}</main>
+      </div>
+    </SitesContext.Provider>
   );
 }

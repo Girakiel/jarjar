@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { Database } from '../db';
 import { badRequest, clamp, int, notFound, rangeFromQuery, str } from '../http';
+import { pageStats, siteSummaries } from '../pages';
 import { cleanFeedbackConfig, normalizeDomain, type SiteRow, type SiteStore } from '../sites';
 
 type Params = { siteId: string };
@@ -20,16 +21,14 @@ export async function siteRoutes(app: FastifyInstance, opts: { db: Database; sit
   };
 
   app.get('/sites', async () => {
-    const stats = db.all<{ site_id: string; sessions: number; last_seen: number | null }>(
-      'SELECT site_id, COUNT(*) AS sessions, MAX(last_seen_at) AS last_seen FROM sessions WHERE started_at > ? GROUP BY site_id',
-      Date.now() - 30 * 86_400_000,
-    );
-    const bySite = new Map(stats.map((s) => [s.site_id, s]));
-    return sites.list().map((site) => ({
-      ...site,
-      sessions30d: bySite.get(site.id)?.sessions ?? 0,
-      lastSeenAt: bySite.get(site.id)?.last_seen ?? null,
-    }));
+    const summary = siteSummaries(db);
+    return sites.list().map((site) => ({ ...site, ...summary(site.id) }));
+  });
+
+  app.get<{ Params: Params }>('/sites/:siteId/pages', async (request) => {
+    const site = requireSite(request.params.siteId);
+    const { from, to } = rangeFromQuery(request.query as Record<string, unknown>);
+    return pageStats(db, site.id, from, to);
   });
 
   app.post('/sites', async (request) => {
