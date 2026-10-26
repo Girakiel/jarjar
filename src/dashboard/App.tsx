@@ -1,6 +1,6 @@
 import { createContext, lazy, Suspense, useContext, useEffect, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import { api, type User } from './api';
+import { api, type User, type Version } from './api';
 import { Layout } from './components/Layout';
 import { Spinner } from './components/ui';
 import { AuthPage } from './pages/Auth';
@@ -23,9 +23,10 @@ const HeatmapsPage = lazy(() => import('./pages/Heatmaps').then((m) => ({ defaul
 interface AuthState {
   user: User | null;
   needsSetup: boolean;
+  version?: Version | null;
 }
 
-const AuthContext = createContext<{ user: User; logout: () => Promise<void> } | null>(null);
+const AuthContext = createContext<{ user: User; version: Version | null; logout: () => Promise<void> } | null>(null);
 
 export function useAuth() {
   const ctx = useContext(AuthContext);
@@ -49,7 +50,14 @@ export function App() {
   if (error) return <div className="center error-box">Could not reach the jarjar server: {error}</div>;
   if (!auth) return <Spinner />;
   if (!auth.user) {
-    return <AuthPage needsSetup={auth.needsSetup} onAuthenticated={(user) => setAuth({ user, needsSetup: false })} />;
+    // The version is only sent to signed-in users, so fetch it again after signing in.
+    const onAuthenticated = (user: User) => {
+      setAuth({ user, needsSetup: false });
+      api<AuthState>('/auth/me')
+        .then((me) => setAuth((a) => (a?.user ? { ...a, version: me.version } : a)))
+        .catch(() => {});
+    };
+    return <AuthPage needsSetup={auth.needsSetup} onAuthenticated={onAuthenticated} />;
   }
 
   const logout = async () => {
@@ -58,7 +66,7 @@ export function App() {
   };
 
   return (
-    <AuthContext.Provider value={{ user: auth.user, logout }}>
+    <AuthContext.Provider value={{ user: auth.user, version: auth.version ?? null, logout }}>
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Home />} />

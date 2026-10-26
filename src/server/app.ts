@@ -68,7 +68,7 @@ export async function buildApp({ config, db: providedDb, logger = true }: AppOpt
         request.user = userForToken(db, sessionToken(request)) ?? null;
         if (!request.user && !request.url.startsWith('/api/auth/')) throw new HttpError(401, 'Not signed in');
       });
-      await api.register(authRoutes, { prefix: '/auth', db, secureCookies: config.secureCookies });
+      await api.register(authRoutes, { prefix: '/auth', db, secureCookies: config.secureCookies, version: config.version });
       await api.register(siteRoutes, { db, sites });
       await api.register(sessionRoutes, { db });
       await api.register(heatmapRoutes, { db });

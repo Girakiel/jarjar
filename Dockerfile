@@ -20,4 +20,9 @@ USER node
 VOLUME ["/data"]
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1:3000/health || exit 1
+# The commit this image was built from, shown in the dashboard. Last, so a new value doesn't invalidate the layers above.
+ARG JARJAR_COMMIT=""
+ARG JARJAR_COMMIT_DATE=""
+ENV JARJAR_COMMIT=$JARJAR_COMMIT \
+    JARJAR_COMMIT_DATE=$JARJAR_COMMIT_DATE
 CMD ["node", "--disable-warning=ExperimentalWarning", "dist/server/index.js"]

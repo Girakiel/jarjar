@@ -1,8 +1,13 @@
 # Production stack: jarjar behind Caddy, which gets and renews HTTPS certificates automatically.
 # Usage (from this folder): echo "JARJAR_DOMAIN=jarjar.example.com" > .env && docker compose up -d --build
+# On a server, prefer ../deploy/update.sh, which also records the version being built.
 services:
   jarjar:
-    build: ..
+    build:
+      context: ..
+      args:
+        JARJAR_COMMIT: ${JARJAR_COMMIT:-}
+        JARJAR_COMMIT_DATE: ${JARJAR_COMMIT_DATE:-}
     restart: unless-stopped
     environment:
       JARJAR_TRUST_PROXY: "true"

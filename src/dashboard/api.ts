@@ -73,6 +73,12 @@ export interface User {
   email: string;
 }
 
+/** The git commit the running server was built from. */
+export interface Version {
+  commit: string;
+  date: string | null;
+}
+
 export interface Site {
   id: string;
   name: string;

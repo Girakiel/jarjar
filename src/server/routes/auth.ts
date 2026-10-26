@@ -9,6 +9,7 @@ import {
   userForToken,
   verifyPassword,
 } from '../auth';
+import type { Version } from '../config';
 import type { Database } from '../db';
 import { badRequest, HttpError, str } from '../http';
 
@@ -23,12 +24,13 @@ function credentials(body: unknown): { email: string; password: string } {
   return { email, password };
 }
 
-export async function authRoutes(app: FastifyInstance, opts: { db: Database; secureCookies: boolean }): Promise<void> {
-  const { db, secureCookies } = opts;
+export async function authRoutes(app: FastifyInstance, opts: { db: Database; secureCookies: boolean; version: Version | null }): Promise<void> {
+  const { db, secureCookies, version } = opts;
   const userCount = () => db.get<{ n: number }>('SELECT COUNT(*) AS n FROM users')!.n;
 
   app.get('/me', async (request) => {
-    return { user: userForToken(db, sessionToken(request)) ?? null, needsSetup: userCount() === 0 };
+    const user = userForToken(db, sessionToken(request)) ?? null;
+    return { user, needsSetup: userCount() === 0, version: user ? version : null };
   });
 
   // Creates the first account. Closed as soon as one exists.

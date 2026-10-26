@@ -4,6 +4,7 @@ import { useApi, type Site } from '../api';
 import { useAuth } from '../App';
 import { Icon, type IconName } from './Icon';
 import { Empty, ErrorBox, Spinner } from './ui';
+import { formatDateTime, formatDay } from '../format';
 
 interface SitesContextValue {
   sites: Site[];
@@ -57,7 +58,7 @@ const NAV: Array<{ to: string; label: string; icon: IconName; end?: boolean }> =
 
 export function Layout() {
   const { siteId } = useParams();
-  const { user, logout } = useAuth();
+  const { user, version, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { data: sites, error, reload } = useApi<Site[]>('/sites');
@@ -140,13 +141,21 @@ export function Layout() {
             </nav>
           )}
           <div className="sidebar-footer">
-            <Icon name="user" />
-            <span className="email" title={user.email}>
-              {user.email}
-            </span>
-            <button type="button" className="btn btn-ghost btn-sm btn-icon" title="Sign out" aria-label="Sign out" onClick={logout}>
-              <Icon name="logout" />
-            </button>
+            <div className="sidebar-user">
+              <Icon name="user" />
+              <span className="email" title={user.email}>
+                {user.email}
+              </span>
+              <button type="button" className="btn btn-ghost btn-sm btn-icon" title="Sign out" aria-label="Sign out" onClick={logout}>
+                <Icon name="logout" />
+              </button>
+            </div>
+            {version && (
+              <div className="sidebar-version" title={version.date ? `Built from commit ${version.commit}, made ${formatDateTime(Date.parse(version.date))}` : `Built from commit ${version.commit}`}>
+                Version {version.commit}
+                {version.date && ` · ${formatDay(version.date.slice(0, 10))}`}
+              </div>
+            )}
           </div>
         </aside>
         <main className="main">{content}</main>

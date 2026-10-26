@@ -43,7 +43,7 @@ Open http://localhost:5173 during development; Vite proxies the API and tracker 
 
 ## Deploying
 
-For a production server with automatic HTTPS, follow [deploy/README.md](deploy/README.md). It covers AWS Lightsail step by step; the [`deploy/`](deploy) folder works on any Linux server with Docker.
+For a production server with automatic HTTPS, follow [deploy/README.md](deploy/README.md). It covers AWS Lightsail step by step; the [`deploy/`](deploy) folder works on any Linux server with Docker. The server keeps itself up to date: it installs each new commit on `main` once CI has passed, and rolls back if the new version doesn't start.
 
 For a quick local container:
 

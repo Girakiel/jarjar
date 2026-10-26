@@ -195,11 +195,20 @@ svg.icon {
   margin-top: auto;
   border-top: 1px solid var(--border);
   padding-top: 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.sidebar-user {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
-  color: var(--muted);
+}
+
+.sidebar-version {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--faint);
 }
 
 .sidebar-footer .email {
@@ -267,7 +276,8 @@ svg.icon {
     border: 0;
     padding: 0;
   }
-  .sidebar-footer .email {
+  .sidebar-footer .email,
+  .sidebar-version {
     display: none;
   }
   .main {

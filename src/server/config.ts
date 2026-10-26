@@ -17,6 +17,11 @@ function bool(name: string, fallback: boolean): boolean {
   return ['1', 'true', 'yes', 'on'].includes(raw.toLowerCase());
 }
 
+export interface Version {
+  commit: string;
+  date: string | null;
+}
+
 export interface Config {
   port: number;
   host: string;
@@ -27,6 +32,8 @@ export interface Config {
   dashboardDir: string;
   publicDir: string;
   staticDir: string;
+  /** The git commit this build was made from, set by deploy/update.sh. */
+  version: Version | null;
 }
 
 export function loadConfig(overrides: Partial<Config> = {}): Config {
@@ -40,6 +47,7 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
     dashboardDir: path.join(ROOT_DIR, 'dist/dashboard'),
     publicDir: path.join(ROOT_DIR, 'dist/public'),
     staticDir: path.join(ROOT_DIR, 'public'),
+    version: process.env.JARJAR_COMMIT ? { commit: process.env.JARJAR_COMMIT, date: process.env.JARJAR_COMMIT_DATE || null } : null,
     ...overrides,
   };
 }

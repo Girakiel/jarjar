@@ -50,7 +50,8 @@ function batch(site: string, extra: Record<string, unknown> = {}) {
 
 before(async () => {
   db = new Database(':memory:');
-  ({ app } = await buildApp({ config: loadConfig({ dataDir: '/nonexistent' }), db, logger: false }));
+  const version = { commit: 'abc1234', date: '2026-10-26T12:00:00+01:00' };
+  ({ app } = await buildApp({ config: loadConfig({ dataDir: '/nonexistent', version }), db, logger: false }));
 });
 
 after(async () => {
@@ -65,7 +66,8 @@ describe('auth', () => {
 
   it('reports that setup is needed, then creates the first account once', async () => {
     const me = await api('GET', '/api/auth/me');
-    assert.deepEqual(me.json(), { user: null, needsSetup: true });
+    // The running version is only shown to signed-in users.
+    assert.deepEqual(me.json(), { user: null, needsSetup: true, version: null });
 
     const res = await api('POST', '/api/auth/setup', { email: 'Owner@Example.com', password: 'correct horse' });
     assert.equal(res.statusCode, 200);
@@ -77,6 +79,7 @@ describe('auth', () => {
 
     const after = await api('GET', '/api/auth/me');
     assert.equal(after.json().user.email, 'owner@example.com');
+    assert.deepEqual(after.json().version, { commit: 'abc1234', date: '2026-10-26T12:00:00+01:00' });
   });
 
   it('logs in with the right password only', async () => {

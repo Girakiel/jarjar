@@ -10,7 +10,8 @@ JARJAR_DOMAIN="jarjar.edugamitec.com"
 # Leave empty if the repo is public.
 GITHUB_TOKEN=""
 REPO="Girakiel/jarjar"
-BRANCH="claude/hotjar-mvp"
+# The server installs every commit on this branch once its checks pass (see install-auto-update.sh).
+BRANCH="main"
 
 exec > >(tee -a /var/log/jarjar-setup.log) 2>&1
 echo "jarjar setup started $(date)"
@@ -34,8 +35,8 @@ fi
 git clone --depth 1 --branch "$BRANCH" "$url" /opt/jarjar
 chmod 700 /opt/jarjar
 
-cd /opt/jarjar/deploy
-echo "JARJAR_DOMAIN=${JARJAR_DOMAIN}" > .env
-docker compose up -d --build
+echo "JARJAR_DOMAIN=${JARJAR_DOMAIN}" > /opt/jarjar/deploy/.env
+# Builds and starts jarjar, and keeps it up to date from then on.
+/opt/jarjar/deploy/install-auto-update.sh "$BRANCH"
 
 echo "jarjar setup finished $(date): open https://${JARJAR_DOMAIN}"
