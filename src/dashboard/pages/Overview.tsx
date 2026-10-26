@@ -26,7 +26,7 @@ export function InstallCard({ siteId }: { siteId: string }) {
         <div className="row small muted">
           <Icon name="external" />
           <span>
-            Want to try it first? Open the <a href={`/demo?site=${siteId}`} target="_blank" rel="noreferrer">demo page</a>, click around, then come back.
+            Want to try it first? Use the <Link to={`/sites/${siteId}/test`}>test page</Link> and watch the results appear.
           </span>
         </div>
       </div>

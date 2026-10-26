@@ -11,6 +11,8 @@ import { pageKey } from '../src/shared/protocol';
 const SID = '11111111-1111-4111-8111-111111111111';
 const VID = '22222222-2222-4222-8222-222222222222';
 const PVID = '33333333-3333-4333-8333-333333333333';
+const TEST_SID = '44444444-4444-4444-8444-444444444444';
+const TEST_PVID = '55555555-5555-4555-8555-555555555555';
 
 let app: FastifyInstance;
 let db: Database;
@@ -20,7 +22,7 @@ function api(method: 'GET' | 'POST' | 'PATCH' | 'DELETE', url: string, payload?:
   return app.inject({ method, url, payload: payload as object, headers: { cookie } });
 }
 
-function collect(body: unknown, opts: { gzip?: boolean; origin?: string } = {}) {
+function collect(body: unknown, opts: { gzip?: boolean; origin?: string; host?: string } = {}) {
   const json = JSON.stringify(body);
   return app.inject({
     method: 'POST',
@@ -30,6 +32,7 @@ function collect(body: unknown, opts: { gzip?: boolean; origin?: string } = {}) 
       'content-type': 'text/plain',
       'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36',
       ...(opts.origin ? { origin: opts.origin } : {}),
+      ...(opts.host ? { host: opts.host } : {}),
     },
   });
 }
@@ -117,6 +120,28 @@ describe('tracking', () => {
     assert.equal((await collect(batch(siteId), { origin: 'https://attacker.test' })).statusCode, 403);
   });
 
+  it("accepts data from jarjar's own origin (the demo/test page) whatever the allow-list says", async () => {
+    const config = await app.inject({
+      method: 'GET',
+      url: `/i/config?site=${siteId}`,
+      headers: { host: 'jarjar.local', 'sec-fetch-site': 'same-origin' },
+    });
+    assert.equal(config.statusCode, 200);
+    const t = Date.now();
+    const res = await collect(
+      {
+        site: siteId,
+        sid: TEST_SID,
+        vid: VID,
+        pv: { id: TEST_PVID, url: 'https://jarjar.local/demo?site=x', title: 'Demo', ts: t, vw: 1280, vh: 800, dh: 2000, sy: 800 },
+        events: [{ type: 4, timestamp: t, data: { href: 'https://jarjar.local/demo', width: 1280, height: 800 } }],
+        tags: ['jarjar_test'],
+      },
+      { origin: 'https://jarjar.local', host: 'jarjar.local' },
+    );
+    assert.equal(res.statusCode, 204, res.body);
+  });
+
   it('ingests a gzipped batch with recording, clicks and moves', async () => {
     const t = Date.now();
     const events = [
@@ -145,6 +170,13 @@ describe('tracking', () => {
     // A follow-up batch for the same page view only updates it.
     const res2 = await collect(batch(siteId, { pv: { ...batch(siteId).pv, sy: 2400, dh: 3300 } }), { origin: 'https://shop.example.com' });
     assert.equal(res2.statusCode, 204);
+  });
+
+  it('deletes test-page sessions only', async () => {
+    const res = await api('DELETE', `/api/sites/${siteId}/test-data`);
+    assert.deepEqual(res.json(), { sessions: 1 });
+    assert.equal(db.get('SELECT 1 AS x FROM sessions WHERE id = ?', TEST_SID), undefined);
+    assert.ok(db.get('SELECT 1 AS x FROM sessions WHERE id = ?', SID));
   });
 
   it('lists the session with derived stats', async () => {

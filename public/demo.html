@@ -36,13 +36,17 @@
     </style>
     <script>
       // Loads the tracker for the site key given in ?site=..., using this server as the jarjar host.
+      // Visits are tagged as tests so the dashboard can find and delete them.
       (function () {
         var site = new URLSearchParams(location.search).get('site');
         if (!site) return;
+        window.jarjar = window.jarjar || function () { (window.jarjar.q = window.jarjar.q || []).push(arguments); };
+        window.jarjar('event', 'jarjar_test');
         var s = document.createElement('script');
         s.async = true;
         s.src = '/t.js';
         s.dataset.site = site;
+        s.dataset.freshConfig = '';
         document.head.appendChild(s);
       })();
     </script>

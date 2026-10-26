@@ -1463,3 +1463,121 @@ tr.clickable:hover td {
 .site-select {
   width: 100%;
 }
+
+/* ---------- test page ---------- */
+
+.test-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 16px;
+  height: calc(100vh - 140px);
+  min-height: 560px;
+}
+
+@media (max-width: 1000px) {
+  .test-layout {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+  .test-stage {
+    height: 75vh;
+  }
+}
+
+.test-stage {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  padding: 12px;
+  background: repeating-conic-gradient(var(--surface-2) 0% 25%, var(--bg) 0% 50%) 50% / 20px 20px;
+}
+
+.test-frame {
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  box-shadow: var(--shadow-lg);
+  background: white;
+  flex: none;
+}
+
+.test-frame iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: 0;
+  transform-origin: top left;
+}
+
+.test-results {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.checklist {
+  list-style: none;
+  margin: 0;
+  padding: 8px 12px;
+}
+
+.checklist li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px 4px;
+}
+
+.checklist li > span:last-child {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.checklist li strong {
+  font-weight: 500;
+}
+
+.check-mark {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--border-strong);
+  display: grid;
+  place-items: center;
+  flex: none;
+  margin-top: 1px;
+}
+
+.checklist li.done .check-mark {
+  background: var(--success);
+  border-color: var(--success);
+  color: white;
+}
+
+.check-mark svg.icon {
+  width: 12px;
+  height: 12px;
+  stroke-width: 3;
+}
+
+.test-actions {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--border);
+}
+
+.link-button {
+  border: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  color: var(--accent-text);
+  cursor: pointer;
+  text-decoration: underline;
+}

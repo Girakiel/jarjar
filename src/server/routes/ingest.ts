@@ -21,6 +21,14 @@ function countryOf(request: FastifyRequest): string | null {
   return null;
 }
 
+function originHost(origin: string): string | null {
+  try {
+    return new URL(origin).host;
+  } catch {
+    return null;
+  }
+}
+
 async function readJson(request: FastifyRequest): Promise<unknown> {
   let body = request.body as Buffer | undefined;
   if (!Buffer.isBuffer(body) || body.length === 0) throw badRequest('empty body');
@@ -57,7 +65,11 @@ export async function ingestRoutes(app: FastifyInstance, opts: { db: Database; s
   function siteFor(request: FastifyRequest, key: string): Site {
     const site = sites.get(key);
     if (!site) throw new HttpError(404, 'unknown site');
-    if (!originAllowed(site, request.headers.origin)) throw new HttpError(403, 'origin not allowed');
+    // jarjar's own demo/test page is always allowed to send data, whatever the site's allow-list says.
+    // Browsers omit Origin on same-origin GETs, so fall back to Sec-Fetch-Site for those.
+    const origin = request.headers.origin;
+    const ownOrigin = origin ? originHost(origin) === request.headers.host : request.headers['sec-fetch-site'] === 'same-origin';
+    if (!ownOrigin && !originAllowed(site, origin)) throw new HttpError(403, 'origin not allowed');
     return site;
   }
 

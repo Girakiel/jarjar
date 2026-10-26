@@ -88,13 +88,18 @@ class Tracker {
   constructor(
     private readonly site: string,
     private readonly host: string,
+    // jarjar's own test page wants settings changes to apply on the next reload, not after the cache expires.
+    private readonly freshConfig = false,
   ) {}
 
   async start(): Promise<void> {
     if (isOptedOut()) return;
     let config: TrackerConfig;
     try {
-      const res = await fetch(`${this.host}/i/config?site=${encodeURIComponent(this.site)}`, { credentials: 'omit' });
+      const res = await fetch(`${this.host}/i/config?site=${encodeURIComponent(this.site)}`, {
+        credentials: 'omit',
+        cache: this.freshConfig ? 'no-cache' : 'default',
+      });
       if (!res.ok) return;
       config = await res.json();
     } catch {
@@ -494,7 +499,7 @@ interface JarjarWindow extends Window {
     return;
   }
 
-  const tracker = new Tracker(site, host);
+  const tracker = new Tracker(site, host, script?.dataset.freshConfig !== undefined);
   const queued = w.jarjar?.q ?? [];
   w.jarjar = (cmd: string, ...args: unknown[]) => tracker.command(cmd, args);
   for (const call of queued) {

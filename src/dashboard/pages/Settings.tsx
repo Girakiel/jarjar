@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api, type Site } from '../api';
 import { Icon } from '../components/Icon';
 import { useSite } from '../components/Layout';
@@ -94,7 +94,7 @@ export function SettingsPage() {
             <div className="row small muted">
               <Icon name="external" />
               <span>
-                Try it on the <a href={`/demo?site=${site.id}`} target="_blank" rel="noreferrer">demo page</a>. Add <code>data-jj-mask</code> to elements whose text should never be recorded, or{' '}
+                Try it on the <Link to={`/sites/${site.id}/test`}>test page</Link>. Add <code>data-jj-mask</code> to elements whose text should never be recorded, or{' '}
                 <code>data-jj-block</code> to hide them entirely.
               </span>
             </div>

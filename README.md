@@ -25,7 +25,7 @@ Open http://localhost:3000, create the owner account, add a site, and paste the 
 <script async src="https://your-jarjar-host/t.js" data-site="SITE_KEY"></script>
 ```
 
-Don't have a site handy? Every site has a demo page at `/demo?site=SITE_KEY` with the tracker installed. Click around there, then open **Recordings** and **Heatmaps**.
+Don't have a site handy, or don't want to touch it yet? Open **Test page** in the dashboard. It embeds a demo shop with the tracker installed and shows live what jarjar captures as you use it (recording, clicks, rage clicks, errors, scroll depth, events, feedback, heatmap snapshot), with links to the results and a button to delete the test data.
 
 ### Development
 

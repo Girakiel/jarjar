@@ -63,6 +63,8 @@ function toSession(row: SessionRow) {
   };
 }
 
+export const TEST_TAG = 'jarjar_test';
+
 const SORTS: Record<string, string> = {
   newest: 's.started_at DESC',
   oldest: 's.started_at ASC',
@@ -162,6 +164,18 @@ export async function sessionRoutes(app: FastifyInstance, opts: { db: Database }
       if (inner) parts.push(inner);
     }
     return sendJson(request, reply, `[${parts.join(',')}]`);
+  });
+
+  // Removes everything recorded on jarjar's demo/test page, which tags its sessions with TEST_TAG.
+  app.delete<{ Params: { siteId: string } }>('/sites/:siteId/test-data', async (request) => {
+    const siteId = request.params.siteId;
+    const sessions = db.transaction(() => {
+      const ids = `SELECT s.id FROM sessions s WHERE s.site_id = ? AND EXISTS (SELECT 1 FROM json_each(s.tags) WHERE value = '${TEST_TAG}')`;
+      db.run(`DELETE FROM feedback WHERE site_id = ? AND session_id IN (${ids})`, siteId, siteId);
+      db.run("DELETE FROM snapshots WHERE site_id = ? AND path = '/demo'", siteId);
+      return db.run(`DELETE FROM sessions WHERE id IN (${ids})`, siteId).changes;
+    });
+    return { sessions };
   });
 
   app.delete<{ Params: { id: string } }>('/sessions/:id', async (request) => {

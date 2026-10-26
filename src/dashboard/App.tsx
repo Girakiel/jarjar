@@ -9,6 +9,7 @@ import { Home, NewSitePage } from './pages/Sites';
 import { OverviewPage } from './pages/Overview';
 import { RecordingsPage } from './pages/Recordings';
 import { SettingsPage } from './pages/Settings';
+import { TestPage } from './pages/Test';
 
 // The replayer pages pull in rrweb, so they're split out of the main bundle.
 const ReplayPage = lazy(() => import('./pages/Replay').then((m) => ({ default: m.ReplayPage })));
@@ -63,6 +64,7 @@ export function App() {
             <Route path="recordings/:sessionId" element={<Suspense fallback={<Spinner />}><ReplayPage /></Suspense>} />
             <Route path="heatmaps" element={<Suspense fallback={<Spinner />}><HeatmapsPage /></Suspense>} />
             <Route path="feedback" element={<FeedbackPage />} />
+            <Route path="test" element={<TestPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
