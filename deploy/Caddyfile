@@ -1,0 +1,4 @@
+{$JARJAR_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy jarjar:3000
+}

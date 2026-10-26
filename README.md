@@ -37,7 +37,11 @@ npm run typecheck
 
 Open http://localhost:5173 during development; Vite proxies the API and tracker to port 3000.
 
-## Docker
+## Deploying
+
+For a production server with automatic HTTPS, follow [deploy/README.md](deploy/README.md). It covers AWS Lightsail step by step; the [`deploy/`](deploy) folder works on any Linux server with Docker.
+
+For a quick local container:
 
 ```bash
 docker compose up -d
