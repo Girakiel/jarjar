@@ -228,9 +228,9 @@ export async function ingest(db: Database, site: Site, payload: CollectPayload, 
 
     for (const c of clicks) {
       db.run(
-        `INSERT INTO clicks (session_id, site_id, path, device, ts, selector, rel_x, rel_y, page_x, page_y, rage, dead, label)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        payload.sid, site.id, path, device, now, c.s, c.rx, c.ry, c.x, c.y, c.r ? 1 : 0, c.d ? 1 : 0, c.l ?? null,
+        `INSERT INTO clicks (session_id, site_id, path, device, ts, selector, rel_x, rel_y, page_x, page_y, rage, dead, label, client_ts)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        payload.sid, site.id, path, device, now, c.s, c.rx, c.ry, c.x, c.y, c.r ? 1 : 0, c.d ? 1 : 0, c.l ?? null, c.t || null,
       );
     }
     for (const e of payload.errs ?? []) {

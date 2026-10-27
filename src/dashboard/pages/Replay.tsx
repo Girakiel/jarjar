@@ -7,6 +7,7 @@ import { api, useApi, type SessionDetail } from '../api';
 import { DeviceIcon, Icon, type IconName } from '../components/Icon';
 import { useSite } from '../components/Layout';
 import { Empty, ErrorBox, PageHeader, Spinner, useDays } from '../components/ui';
+import { attachReplayFixes } from '../components/replayFixes';
 import { flag, formatBytes, formatDateTime, formatDuration, pathOf, RATING_EMOJI } from '../format';
 import { sessionLabel } from './Recordings';
 
@@ -132,6 +133,20 @@ function Player({
       },
     }) as PlayerInstance;
     playerRef.current = player;
+    const replayer = player.getReplayer();
+    const fixes = attachReplayFixes(replayer, { playing: true });
+    // Replayed focus events move keyboard focus into the recording. Keys pressed then must not act on
+    // the replayed page (Space would tick a checkbox there); Space still plays and pauses.
+    const onFrameKey = (e: KeyboardEvent) => {
+      e.preventDefault();
+      if (e.type === 'keydown' && e.code === 'Space') player.toggle();
+    };
+    const guardKeys = () => {
+      const frameDoc = replayer.iframe.contentDocument;
+      for (const type of ['keydown', 'keypress', 'keyup']) frameDoc?.addEventListener(type, onFrameKey as EventListener, true);
+    };
+    replayer.on('fullsnapshot-rebuilded', guardKeys); // a rebuilt page drops its listeners
+    guardKeys();
     if (startAt) player.goto(startAt, true);
     player.addEventListener('ui-update-current-time', (detail) => onTimeRef.current((detail as { payload: number }).payload));
 
@@ -154,7 +169,9 @@ function Player({
       window.removeEventListener('keydown', onKey);
       observer.disconnect();
       playerRef.current = null;
-      player.getReplayer().destroy();
+      fixes.detach();
+      replayer.off('fullsnapshot-rebuilded', guardKeys);
+      replayer.destroy();
       player.$destroy();
     };
   }, [events, playerRef]);

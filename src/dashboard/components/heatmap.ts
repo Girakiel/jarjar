@@ -48,26 +48,97 @@ function stamp(radius: number): HTMLCanvasElement {
   return c;
 }
 
-/** Maps stored points onto the rebuilt page: relative to their element when it can be found, else raw page coordinates. */
-export function resolvePoints(doc: Document, data: PointData): Array<[number, number]> {
+export interface Box {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+/** Whether an element (from the snapshot frame) is actually shown: rendered, not hidden and not transparent. */
+function isShown(el: Element, r: DOMRect): boolean {
+  if (r.width === 0 && r.height === 0) return false;
+  const check = (el as Element & { checkVisibility?: (o: object) => boolean }).checkVisibility;
+  return check ? check.call(el, { opacityProperty: true, visibilityProperty: true }) : true;
+}
+
+/**
+ * Where each selector's element is on the rebuilt page, in page coordinates. Null when the element
+ * isn't there or isn't shown, such as a closed pop-up or menu.
+ */
+export function locateSelectors(doc: Document, selectors: string[]): Array<Box | null> {
   const win = doc.defaultView;
   const sx = win?.scrollX ?? 0;
   const sy = win?.scrollY ?? 0;
-  const rects = data.selectors.map((selector) => {
+  return selectors.map((selector) => {
     try {
       const el = doc.querySelector(selector);
       if (!el) return null;
       const r = el.getBoundingClientRect();
-      if (r.width === 0 && r.height === 0) return null;
+      if (!isShown(el, r)) return null;
       return { left: r.left + sx, top: r.top + sy, width: r.width, height: r.height };
     } catch {
       return null;
     }
   });
-  return data.points.map(([i, rx, ry, x, y]) => {
-    const r = rects[i];
-    return r ? [r.left + rx * r.width, r.top + ry * r.height] : [x, y];
-  });
+}
+
+/**
+ * Places stored points relative to their element. Points on elements that aren't shown are left out:
+ * drawn at their raw coordinates they'd land on whatever is underneath.
+ */
+export function resolvePoints(data: PointData, boxes: Array<Box | null>): Array<[number, number]> {
+  const out: Array<[number, number]> = [];
+  for (const [i, rx, ry] of data.points) {
+    const r = boxes[i];
+    if (r) out.push([r.left + rx * r.width, r.top + ry * r.height]);
+  }
+  return out;
+}
+
+export interface HiddenGroup {
+  /** The outermost part of the page, shared by these elements, that isn't shown (like the pop-up itself). */
+  container: string;
+  selectors: string[];
+  count: number;
+}
+
+/** Splits a selector built by the tracker (`body>div:nth-of-type(2)>a`) into its steps. */
+function steps(selector: string): string[] {
+  return selector.split(/(?<!\\)>/);
+}
+
+/**
+ * Clicks on elements that aren't shown on the rebuilt page, grouped by the closed part of the page
+ * they're in, so one pop-up is one group. Biggest first.
+ */
+export function hiddenGroups(doc: Document, data: PointData, boxes: Array<Box | null>): HiddenGroup[] {
+  const counts = new Map<number, number>();
+  for (const [i] of data.points) if (!boxes[i]) counts.set(i, (counts.get(i) ?? 0) + 1);
+  const groups = new Map<string, HiddenGroup>();
+  for (const [i, count] of counts) {
+    const selector = data.selectors[i];
+    const parts = steps(selector);
+    let container = selector;
+    for (let n = 1; n <= parts.length; n++) {
+      const prefix = parts.slice(0, n).join('>');
+      let el: Element | null = null;
+      try {
+        el = doc.querySelector(prefix);
+      } catch {
+        break;
+      }
+      if (!el || !isShown(el, el.getBoundingClientRect())) {
+        container = prefix;
+        break;
+      }
+    }
+    const group = groups.get(container) ?? { container, selectors: [], count: 0 };
+    group.selectors.push(selector);
+    group.count += count;
+    groups.set(container, group);
+  }
+  return [...groups.values()].sort((a, b) => b.count - a.count);
 }
 
 export function drawHeat(

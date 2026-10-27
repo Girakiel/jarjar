@@ -8,6 +8,7 @@ type Params = { siteId: string };
 const MAX_CLICK_POINTS = 50_000;
 const MAX_MOVE_POINTS = 60_000;
 const MAX_SCROLL_ROWS = 50_000;
+const MAX_MOMENT_SELECTORS = 300;
 
 function deviceParam(value: unknown): Device {
   const device = str(value, 10) as Device;
@@ -97,6 +98,40 @@ export async function heatmapRoutes(app: FastifyInstance, opts: { db: Database }
     );
     if (!row) throw notFound('No snapshot of this page has been captured for this device yet');
     return sendGzippedJson(request, reply, row.data);
+  });
+
+  // For clicks on elements the page's snapshot doesn't show (pop-ups, menus): how often each was
+  // clicked, its label, and the latest recorded click, whose moment the dashboard can show instead.
+  app.post<{ Params: Params }>('/sites/:siteId/heatmaps/moments', async (request) => {
+    const b = (request.body ?? {}) as Record<string, unknown>;
+    const { from, to } = rangeFromQuery(b);
+    const path = pathParam(b.path);
+    const device = deviceParam(b.device);
+    const selectors = (Array.isArray(b.selectors) ? b.selectors : [])
+      .slice(0, MAX_MOMENT_SELECTORS)
+      .map((s) => str(s, 1000))
+      .filter(Boolean);
+    if (!selectors.length) return [];
+    // Clicks stored before client_ts existed: estimate the visitor's clock from the session's offset.
+    const rows = db.all<{ selector: string; count: number; label: string | null; session: string; ts: number; recorded: number }>(
+      `SELECT selector, count, label, session, ts, recorded FROM (
+         SELECT c.selector, c.session_id AS session, COALESCE(c.client_ts, c.ts - (s.started_at - s.first_ts)) AS ts,
+                s.recording_bytes > 0 AS recorded,
+                COUNT(*) OVER (PARTITION BY c.selector) AS count,
+                MAX(c.label) OVER (PARTITION BY c.selector) AS label,
+                ROW_NUMBER() OVER (PARTITION BY c.selector ORDER BY s.recording_bytes > 0 DESC, c.ts DESC, c.client_ts DESC) AS rn
+         FROM clicks c JOIN sessions s ON s.id = c.session_id
+         WHERE c.site_id = ? AND c.path = ? AND c.device = ? AND c.ts >= ? AND c.ts < ?
+           AND c.selector IN (${selectors.map(() => '?').join(', ')})
+       ) WHERE rn = 1`,
+      request.params.siteId, path, device, from, to, ...selectors,
+    );
+    return rows.map((r) => ({
+      selector: r.selector,
+      count: r.count,
+      label: r.label,
+      moment: r.recorded ? { session: r.session, ts: r.ts } : null,
+    }));
   });
 
   app.get<{ Params: Params }>('/sites/:siteId/heatmaps/data', async (request, reply) => {

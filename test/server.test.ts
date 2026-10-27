@@ -241,6 +241,27 @@ describe('tracking', () => {
     assert.deepEqual(scroll.reach, [[2400, 3300, 800]]);
   });
 
+  it('finds a recorded moment for clicks on elements the snapshot may not show', async () => {
+    const moments = (selectors: string[]) => api('POST', `/api/sites/${siteId}/heatmaps/moments`, { path: '/pricing', device: 'desktop', selectors });
+    const res = await moments(['body>button', 'body>nowhere']);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.json().length, 1);
+    const [m] = res.json();
+    assert.equal(m.selector, 'body>button');
+    assert.equal(m.count, 2);
+    // The latest click, on the visitor's clock so it lines up with the recording.
+    const latest = db.get<{ t: number }>("SELECT MAX(client_ts) AS t FROM clicks WHERE session_id = ? AND selector = 'body>button'", SID)!.t;
+    assert.deepEqual(m.moment, { session: SID, ts: latest });
+
+    // Clicks stored before the visitor's clock was kept: estimated from the session's clock offset.
+    db.run('UPDATE clicks SET client_ts = NULL WHERE session_id = ?', SID);
+    const s = db.get<{ offset: number }>('SELECT started_at - first_ts AS offset FROM sessions WHERE id = ?', SID)!;
+    const serverTs = db.get<{ t: number }>('SELECT MAX(ts) AS t FROM clicks WHERE session_id = ?', SID)!.t;
+    assert.equal((await moments(['body>button'])).json()[0].moment.ts, serverTs - s.offset);
+
+    assert.deepEqual((await moments([])).json(), []);
+  });
+
   it('summarises the site on the overview', async () => {
     const res = (await api('GET', `/api/sites/${siteId}/overview?days=7&tz=-60`)).json();
     assert.equal(res.totals.sessions, 1);

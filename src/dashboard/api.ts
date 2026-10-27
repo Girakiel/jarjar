@@ -218,6 +218,14 @@ export interface PointData {
   top: Array<{ selector: string; count: number; rage: number }>;
 }
 
+/** A clicked element the page's snapshot doesn't show, with a recorded moment of a click on it. */
+export interface HeatmapMoment {
+  selector: string;
+  count: number;
+  label: string | null;
+  moment: { session: string; ts: number } | null;
+}
+
 export interface ScrollData {
   type: 'scroll';
   pageviews: number;

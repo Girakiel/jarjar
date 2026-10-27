@@ -245,6 +245,10 @@ const MIGRATIONS: string[] = [
     PRIMARY KEY (site_id, key)
   );
   `,
+  `
+  -- The visitor's own clock at the click, which lines up with the recording (ts is when it arrived).
+  ALTER TABLE clicks ADD COLUMN client_ts INTEGER;
+  `,
 ];
 
 export type Row = Record<string, SQLInputValue>;

@@ -1,14 +1,24 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { Device, FeedbackItem } from '../api';
 import { RATING_EMOJI } from '../format';
 import { Icon } from './Icon';
-import { highlightElement, SnapshotStage, useSnapshotFrame } from './Snapshot';
+import { highlightElement, SnapshotStage, useSnapshotFrame, type Moment } from './Snapshot';
 
 /** Shows the page a piece of feedback was left on, with the element the visitor pointed at outlined. */
 export function ElementModal({ siteId, item, recordingLink, onClose }: { siteId: string; item: FeedbackItem; recordingLink: string | null; onClose: () => void }) {
   const device = (['desktop', 'tablet', 'mobile'].includes(item.device) ? item.device : 'desktop') as Device;
-  const frame = useSnapshotFrame(siteId, item.path, device);
+  // The page as it was when the feedback was sent, pop-ups included, when the visit was recorded.
+  // Falls back to the page's snapshot if that moment can't be shown.
+  const [momentFailed, setMomentFailed] = useState(false);
+  const moment = useMemo<Moment | null>(
+    () => (!momentFailed && item.sessionId && item.hasRecording && item.clientTs ? { session: item.sessionId, ts: item.clientTs } : null),
+    [momentFailed, item.sessionId, item.hasRecording, item.clientTs],
+  );
+  const frame = useSnapshotFrame(siteId, item.path, device, moment);
+  useEffect(() => {
+    if (moment && frame.status === 'error') setMomentFailed(true);
+  }, [moment, frame.status]);
   const [placed, setPlaced] = useState<'element' | 'position' | null>(null);
   const { status, doc, layoutTick } = frame;
   const element = item.element;
@@ -36,7 +46,7 @@ export function ElementModal({ siteId, item, recordingLink, onClose }: { siteId:
               <div className="small muted truncate">
                 {item.path}
                 {status === 'ready' && placed === 'position' && ' · The page has changed since; the outline shows where the element was.'}
-                {status === 'ready' && placed === null && " · The element isn't on the current snapshot of this page."}
+                {status === 'ready' && placed === null && (moment ? " · The element isn't on the page at this moment." : " · The element isn't on the current snapshot of this page.")}
               </div>
             </div>
           </div>

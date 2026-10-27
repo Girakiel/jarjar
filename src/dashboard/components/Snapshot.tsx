@@ -1,12 +1,14 @@
-// Rebuilds a stored page snapshot (rrweb full snapshot) in a sandboxed frame,
-// scaled to fit. Heatmaps draw on top of it; feedback uses it to show the
-// element a visitor pointed at.
+// Rebuilds a page in a sandboxed frame, scaled to fit: either the stored snapshot of the page
+// (an rrweb full snapshot taken as it loaded), or the page at a moment of a recording, which
+// can show pop-ups and menus that were open then. Heatmaps draw on top of it; feedback uses it
+// to show the element a visitor pointed at.
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Replayer } from '@rrweb/replay';
 import '@rrweb/replay/dist/style.css';
 import { api, ApiError, type Device } from '../api';
 import { Icon } from './Icon';
+import { attachReplayFixes } from './replayFixes';
 import { ErrorBox } from './ui';
 
 export type SnapshotStatus = 'loading' | 'ready' | 'missing' | 'error';
@@ -28,11 +30,51 @@ export function overlayEl<T extends HTMLElement>(doc: Document, id: string, tag:
   if (!el) {
     el = doc.createElement(tag) as T;
     el.id = id;
-    el.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none;z-index:2147483647;';
+    el.style.cssText =
+      'position:absolute;left:0;top:0;right:auto;bottom:auto;margin:0;padding:0;border:0;background:transparent;overflow:visible;pointer-events:none;z-index:2147483647;';
     // A child of <html> is positioned against the document, regardless of body styles.
     doc.documentElement.appendChild(el);
   }
+  keepAboveTopLayer(doc, el);
   return el;
+}
+
+/**
+ * Open modal dialogs and popovers sit in the browser's top layer, above any z-index. When the page
+ * has one, put the overlay in the top layer too, after it, so it's drawn on top.
+ */
+function keepAboveTopLayer(doc: Document, el: HTMLElement): void {
+  try {
+    const open = doc.querySelector('dialog:modal, :popover-open:not([id^="__jarjar"])');
+    if (el.matches(':popover-open')) el.hidePopover();
+    if (!open) return;
+    el.setAttribute('popover', 'manual');
+    el.showPopover();
+  } catch {
+    /* no top layer support */
+  }
+}
+
+/** A moment of a recording to show instead of the page's stored snapshot. */
+export interface Moment {
+  session: string;
+  ts: number; // client timestamp
+  /** Show the page just before the visitor's click nearest to `ts` (which may be an estimate). */
+  click?: boolean;
+}
+
+// rrweb: an incremental event (3) from mouse interactions (source 2) of type click (2).
+const isClick = (e: { type: number; data: { source?: number; type?: number } }) => e.type === 3 && e.data.source === 2 && e.data.type === 2;
+
+/** When to stop a recording to show `moment`. */
+function momentTime(events: Array<{ type: number; timestamp: number; data: { source?: number; type?: number } }>, moment: Moment): number {
+  if (!moment.click) return moment.ts;
+  let best: number | null = null;
+  for (const e of events) {
+    if (isClick(e) && Math.abs(e.timestamp - moment.ts) < 8000 && (best === null || Math.abs(e.timestamp - moment.ts) < Math.abs(best - moment.ts))) best = e.timestamp;
+  }
+  // Just before the click, while whatever was clicked (say, a pop-up) is still open.
+  return (best ?? moment.ts) - 100;
 }
 
 export interface Rect {
@@ -86,7 +128,7 @@ export function highlightElement(doc: Document, selector: string | null, fallbac
   return how;
 }
 
-export function useSnapshotFrame(siteId: string, path: string, device: Device) {
+export function useSnapshotFrame(siteId: string, path: string, device: Device, moment?: Moment | null) {
   const stageRef = useRef<HTMLDivElement>(null);
   const scalerRef = useRef<HTMLDivElement>(null);
   const replayerRef = useRef<Replayer | null>(null);
@@ -124,11 +166,17 @@ export function useSnapshotFrame(siteId: string, path: string, device: Device) {
     const scaler = scalerRef.current;
     if (!scaler) return;
     let cancelled = false;
+    let fixes: ReturnType<typeof attachReplayFixes> | undefined;
     setStatus('loading');
-    api<Array<{ type: number; data: { width?: number } }>>(`/sites/${siteId}/heatmaps/snapshot?path=${encodeURIComponent(path)}&device=${device}`)
+    const url = moment ? `/sessions/${moment.session}/events` : `/sites/${siteId}/heatmaps/snapshot?path=${encodeURIComponent(path)}&device=${device}`;
+    api<Array<{ type: number; timestamp: number; data: { width?: number; source?: number; type?: number } }>>(url)
       .then((events) => {
         if (cancelled) return;
-        snapWidth.current = events[0]?.data?.width || 1280;
+        const at = moment ? momentTime(events, moment) : 0;
+        if (moment && !events.some((e) => e.type === 2 && e.timestamp <= at)) throw new Error('This moment is no longer in the recording.');
+        // The visitor's window width at that moment (meta events carry it).
+        const meta = events.filter((e) => e.type === 4 && (!moment || e.timestamp <= at)).pop();
+        snapWidth.current = meta?.data?.width || 1280;
         const replayer = new Replayer(events as never, {
           root: scaler,
           showWarning: false,
@@ -138,8 +186,11 @@ export function useSnapshotFrame(siteId: string, path: string, device: Device) {
           insertStyleRules: ['html, body { scroll-behavior: auto !important; }'],
         });
         replayerRef.current = replayer;
+        fixes = attachReplayFixes(replayer);
+        let shown = false;
         replayer.on('fullsnapshot-rebuilded', () => {
-          if (cancelled) return;
+          // A recording can hold several pages; wait for the one at the moment.
+          if (cancelled || shown) return;
           replayer.enableInteract();
           const d = replayer.iframe.contentDocument;
           if (d) {
@@ -158,10 +209,22 @@ export function useSnapshotFrame(siteId: string, path: string, device: Device) {
               true,
             );
           }
+          if (moment) return;
+          show();
+        });
+        const show = () => {
+          shown = true;
+          fixes?.apply();
           layout();
           setStatus('ready');
           setTimeout(() => !cancelled && setLayoutTick((t) => t + 1), 1200);
-        });
+        };
+        if (moment) {
+          // Applies every event up to the moment, then stops there.
+          replayer.pause(Math.max(0, at - events[0].timestamp));
+          // After the replayer's own deferred resize to the recording's first window size.
+          setTimeout(() => !cancelled && show(), 10);
+        }
       })
       .catch((err: ApiError) => {
         if (cancelled) return;
@@ -170,11 +233,13 @@ export function useSnapshotFrame(siteId: string, path: string, device: Device) {
       });
     return () => {
       cancelled = true;
+      fixes?.detach();
       replayerRef.current?.destroy();
       replayerRef.current = null;
       scaler.innerHTML = '';
     };
-  }, [siteId, path, device, layout]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [siteId, path, device, layout, moment?.session, moment?.ts, moment?.click]);
 
   useEffect(() => {
     const stage = stageRef.current;

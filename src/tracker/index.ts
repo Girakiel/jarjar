@@ -14,6 +14,8 @@ import {
   deviceForWidth,
   matchesPage,
   pageKey,
+  POPOVER_OPEN_ATTR,
+  TARGET_ATTR,
   type ClickPoint,
   type CollectPayload,
   type Identity,
@@ -173,6 +175,8 @@ class Tracker {
     this.newPageview();
     this.listen();
     this.startRecording();
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => this.markOutOfDomState());
+    else this.markOutOfDomState();
     this.whenBodyReady(() => {
       this.mountFeedback();
       this.setupSurveys();
@@ -290,6 +294,8 @@ class Tracker {
       if (document.visibilityState === 'hidden') this.flush(true);
     });
     window.addEventListener('pagehide', () => this.flush(true));
+    document.addEventListener('toggle', (e) => this.onToggle(e), true);
+    window.addEventListener('hashchange', () => this.markTarget());
 
     // Single-page apps: treat route changes as new page views.
     for (const method of ['pushState', 'replaceState'] as const) {
@@ -304,6 +310,31 @@ class Tracker {
     window.addEventListener('jarjar:locationchange', onLocation);
     window.addEventListener('popstate', onLocation);
     window.addEventListener('hashchange', onLocation);
+  }
+
+  /** Open popovers and the :target element aren't part of the DOM, so mirror them into attributes rrweb records. */
+  private markOutOfDomState(): void {
+    if (!this.active) return;
+    try {
+      for (const el of Array.from(document.querySelectorAll(':popover-open'))) el.setAttribute(POPOVER_OPEN_ATTR, '');
+    } catch {
+      /* no popover support */
+    }
+    this.markTarget();
+  }
+
+  private onToggle(e: Event): void {
+    const el = e.target;
+    if (!this.active || !(el instanceof HTMLElement) || !el.hasAttribute('popover')) return; // <details> fires toggle too
+    if ((e as Event & { newState?: string }).newState === 'open') el.setAttribute(POPOVER_OPEN_ATTR, '');
+    else el.removeAttribute(POPOVER_OPEN_ATTR);
+  }
+
+  private markTarget(): void {
+    if (!this.active) return;
+    const target = document.querySelector(':target');
+    for (const el of Array.from(document.querySelectorAll(`[${TARGET_ATTR}]`))) if (el !== target) el.removeAttribute(TARGET_ATTR);
+    target?.setAttribute(TARGET_ATTR, '');
   }
 
   private onLocationChange(): void {

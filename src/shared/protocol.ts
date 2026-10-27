@@ -29,6 +29,14 @@ export function pageKey(href: string): string {
 }
 
 /**
+ * Page state that lives outside the DOM, so recordings can't capture it. The tracker mirrors it into
+ * these attributes on the visitor's page, and the replayer turns them back into the real state:
+ * an open popover (popover API, shown in the top layer) and the element matching CSS `:target`.
+ */
+export const POPOVER_OPEN_ATTR = 'data-jj-popover-open';
+export const TARGET_ATTR = 'data-jj-target';
+
+/**
  * Whether a page path matches a list of patterns such as `/pricing`, `/blog/*` or `*checkout*`.
  * `*` matches anything; an empty list matches every page.
  */
